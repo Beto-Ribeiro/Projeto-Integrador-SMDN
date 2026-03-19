@@ -1,3 +1,3 @@
 # Projeto-Integrador-SMDN
-Integrantes: Vinícius, Mauro, Thierry
+Integrantes: Vinícius, Mauro, Thierry, Alessandra
 
