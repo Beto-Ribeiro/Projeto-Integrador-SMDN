@@ -1,2 +1,3 @@
 # Projeto-Integrador-SMDN
-Integrantes: Vinícius
+Integrantes: Vinícius, Mauro
+
