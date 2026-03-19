@@ -1,3 +1,3 @@
 # Projeto-Integrador-SMDN
-Integrantes: Vinícius, Mauro
+Integrantes: Vinícius, Mauro, Thierry, Jeffrey Epstein
 
