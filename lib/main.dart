@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://robfgvtnoooivihlnomr.supabase.co',
+    anonKey: 'sb_publishable_eVCeoqzfhoAgkpBnJxzs7w_-PGO0TO9',
+  );
+
   runApp(const MyApp());
+
+
 }
 
 class MyApp extends StatelessWidget {
@@ -110,6 +120,7 @@ class _MyHomePageState extends State<MyHomePage> {
           verticalDirection: VerticalDirection.up,
           mainAxisSize: MainAxisSize.max,
           children: <Widget>[
+
             Container(
               padding: EdgeInsets.fromLTRB(25, 100, 25, 100),
               decoration: BoxDecoration(
@@ -188,6 +199,30 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: ((context) {
+                return SimpleDialog(
+                  title: const Text('Add a Note'),
+                  contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 30 ),
+                  children: [
+                    TextFormField(
+                      onFieldSubmitted: (value) async {
+                        await Supabase.instance.client
+                            .from('Notas')
+                            .insert({'body': value});
+                      },
+                    ), // TextFormField
+                  ],
+                ); // SimpleDialog
+              }),
+            );
+          },
+          child: const Icon(Icons.add),
+        ),
     );
   }
 }
