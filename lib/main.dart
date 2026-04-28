@@ -10,8 +10,6 @@ void main() async {
   );
 
   runApp(const MyApp());
-
-
 }
 
 class MyApp extends StatelessWidget {
@@ -30,71 +28,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class EmailTextbox extends StatelessWidget {
-  const EmailTextbox({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 350,
-      child: TextField(
-        obscureText: false,
-        decoration: InputDecoration(
-          border: OutlineInputBorder(),
-          labelText: 'Digite seu E-mail',
-        ),
-      ),
-    );
-  }
-}
-
-class SenhaTextbox extends StatelessWidget {
-  const SenhaTextbox({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 350,
-      child: TextField(
-        obscureText: false,
-        decoration: InputDecoration(
-          border: OutlineInputBorder(),
-          labelText: 'Digite sua senha',
-        ),
-      ),
-    );
-  }
-}
-
-class ConSenhaTextbox extends StatelessWidget {
-  const ConSenhaTextbox({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 350,
-      child: TextField(
-        obscureText: false,
-        decoration: InputDecoration(
-          border: OutlineInputBorder(),
-          labelText: 'Confirme sua senha',
-        ),
-      ),
-    );
-  }
-}
-
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
 
   final String title;
 
@@ -103,11 +38,74 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  bool _estaCarregando = false;
 
-  void _incrementCounter() {
+  final _NomeController = TextEditingController();
+  final _CPFController = TextEditingController();
+  final _TelController = TextEditingController();
+  final _EmailController = TextEditingController();
+  final _SenhaController = TextEditingController();
+  final _ConSenhaController = TextEditingController();
+
+  // Função que o botão vai chamar
+  Future<void> _enviarDados() async {
     setState(() {
-      _counter++;
+      _estaCarregando = true;
+    });
+    // Aqui nós "puxamos" os valores atuais dos controladores
+    String Nome = _NomeController.text;
+    String CPF = _CPFController.text;
+    String Tel = _TelController.text;
+    String Email = _EmailController.text;
+    String Senha = _SenhaController.text;
+    String Conf_senha = _ConSenhaController.text;
+
+    if (Nome.isNotEmpty || CPF.isNotEmpty || Tel.isNotEmpty || Email.isNotEmpty || Senha.isNotEmpty || Conf_senha.isNotEmpty) {
+      String os_tres =
+          Nome +
+          " " +
+          CPF +
+          " " +
+          Tel +
+          " " +
+          Email +
+          " " +
+          Senha +
+          " " +
+          Conf_senha;
+          if(Senha != Conf_senha){
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('As senhas inseridas não são iguais.')),
+            );
+            setState(() {
+              _estaCarregando = false;
+            });
+            return;
+          }
+
+      await Supabase.instance.client.from('Notas').insert({
+        'body': os_tres,
+      });
+
+      // Opcional: limpa os campos após o envio bem-sucedido
+      _NomeController.clear();
+      _CPFController.clear();
+      _TelController.clear();
+      _EmailController.clear();
+      _SenhaController.clear();
+      _ConSenhaController.clear();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cadastro Realizado com sucesso!')),
+      );
+    }
+    else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preencha o(s) campo(s) em branco.')),
+      );
+    }
+    setState(() {
+      _estaCarregando = false;
     });
   }
 
@@ -120,9 +118,8 @@ class _MyHomePageState extends State<MyHomePage> {
           verticalDirection: VerticalDirection.up,
           mainAxisSize: MainAxisSize.max,
           children: <Widget>[
-
             Container(
-              padding: EdgeInsets.fromLTRB(25, 100, 25, 100),
+              padding: EdgeInsets.fromLTRB(25, 50, 25, 50),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.only(
@@ -131,7 +128,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ), // Rounds all corners by 20 pixels
               ),
               child: Column(
-                spacing: 30,
+                spacing: 15,
                 mainAxisSize: MainAxisSize.max,
                 children: <Widget>[
                   Row(
@@ -152,21 +149,102 @@ class _MyHomePageState extends State<MyHomePage> {
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      EmailTextbox(),
+                      SizedBox(
+                        width: 350,
+                        child: TextField(
+                          controller: _NomeController,
+                          obscureText: false,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Digite seu Nome',
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SenhaTextbox(),
+                      SizedBox(
+                        width: 350,
+                        child: TextField(
+                          controller: _CPFController,
+                          obscureText: false,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Digite seu CPF',
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      ConSenhaTextbox(),
+                      SizedBox(
+                        width: 350,
+                        child: TextField(
+                          controller: _TelController,
+                          obscureText: false,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Número de telefone',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.max,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 350,
+                        child: TextField(
+                          controller: _EmailController,
+                          obscureText: false,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Digite seu E-mail',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.max,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 350,
+                        child: TextField(
+                          controller: _SenhaController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Digite sua senha',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.max,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 350,
+                        child: TextField(
+                          controller: _ConSenhaController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Confirme sua senha',
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   Row(
@@ -174,19 +252,24 @@ class _MyHomePageState extends State<MyHomePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       ElevatedButton(
-                        onPressed: () {
-                          // ação ao clicar
-                          print('Botão Enviar pressionado');
-                        },
-                        child: Text('Enviar'),
-                      )
+                        onPressed: _estaCarregando ? null : _enviarDados,
+                        child: _estaCarregando
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Enviar'),
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
             Container(
-              margin: EdgeInsets.fromLTRB(0, 100, 0, 150),
+              margin: EdgeInsets.fromLTRB(0, 0, 0, 150),
               child: Text(
                 style: TextStyle(
                   fontSize: 40,
@@ -199,30 +282,29 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: ((context) {
-                return SimpleDialog(
-                  title: const Text('Add a Note'),
-                  contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 30 ),
-                  children: [
-                    TextFormField(
-                      onFieldSubmitted: (value) async {
-                        await Supabase.instance.client
-                            .from('Notas')
-                            .insert({'body': value});
-                      },
-                    ), // TextFormField
-                  ],
-                ); // SimpleDialog
-              }),
-            );
-          },
-          child: const Icon(Icons.add),
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: ((context) {
+              return SimpleDialog(
+                title: const Text('Add a Note'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 30),
+                children: [
+                  TextFormField(
+                    onFieldSubmitted: (value) async {
+                      await Supabase.instance.client.from('Notas').insert({
+                        'body': value,
+                      });
+                    },
+                  ), // TextFormField
+                ],
+              ); // SimpleDialog
+            }),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
