@@ -111,18 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
         Email.isNotEmpty ||
         Senha.isNotEmpty ||
         Conf_senha.isNotEmpty) {
-      String os_tres =
-          Nome +
-          " " +
-          CPF +
-          " " +
-          Tel +
-          " " +
-          Email +
-          " " +
-          Senha +
-          " " +
-          Conf_senha;
+
       if (Senha != Conf_senha) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('As senhas inseridas não são iguais.')),
@@ -134,7 +123,13 @@ class _MyHomePageState extends State<MyHomePage> {
       }
 
       await Supabase.instance.client.from('Notas').insert({
-        'body': os_tres,
+        'nome': Nome,
+        'CPF': CPF,
+        'Tel': Tel,
+        'email': Email,
+        'senha': Senha,
+
+
       });
 
       // Opcional: limpa os campos após o envio bem-sucedido
