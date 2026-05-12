@@ -313,15 +313,8 @@ class _MyHomePageState
         return;
       }
 
-      await Supabase.instance.client
-          .from('Notas')
-          .insert({
-        'nome': Nome,
-        'CPF': CPF,
-        'Tel': Tel,
-        'email': Email,
-        'senha': Senha,
-      });
+
+
 
       _NomeController.clear();
       _CPFController.clear();
