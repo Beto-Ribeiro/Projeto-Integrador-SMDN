@@ -1,4 +1,5 @@
 
+import 'package:branch1/telas/Relatos.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
           seedColor: Colors.blueAccent,
         ),
       ),
-      home: const Cadastro_tela(title: 'maco'),
+      home: const Relatos_tela(title: 'maco'),
     );
   }
 }
