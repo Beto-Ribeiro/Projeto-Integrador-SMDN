@@ -1,355 +1,138 @@
 # ⚠️ DOCUMENTO INTERNO - ACESSO RESTRITO À EQUIPE DO PROJETO
 
-## 1. Identificação do Projeto
-
-* 
-**Instituição:** FATEC - Faculdade de Tecnologia de Taubaté.
-
-
-* 
-**Curso:** Análise e Desenvolvimento de Sistemas (1º Período).
-
-
-* 
-**Módulo do Produto:** Monitoramento.
-
-
-* 
-**Nome do Produto:** SMDN (Sistema de Monitoramento de Desastres Naturais).
-
-
-* 
-**Ano:** 2026.
-
-
+## [cite_start]1. Identificação do Projeto [cite: 30]
+* [cite_start]Instituição: FATEC - Faculdade de Tecnologia de Taubaté[cite: 2, 16].
+* [cite_start]Curso: Análise e Desenvolvimento de Sistemas (1º Período)[cite: 3, 17, 27].
+* [cite_start]Módulo do Produto: Monitoramento[cite: 31].
+* [cite_start]Nome do Produto: SMDN (Sistema de Monitoramento de Desastres Naturais)[cite: 12, 13, 31].
+* [cite_start]Ano: 2026[cite: 15, 34].
 
 ### 1.1 Equipe Scrum e Stakeholders
-
 | Nome | Função |
-| --- | --- |
-| Humberto Araújo Ribeiro Neto | Product Owner 
+| :--- | :--- |
+| Humberto Araújo Ribeiro Neto | [cite_start]Product Owner [cite: 33] |
+| Thierry Monteiro Assis Santos | [cite_start]Scrum Master [cite: 33] |
+| Adryel Luís Rodrigues | [cite_start]Scrum Team [cite: 33] |
+| Alessandra Danielle Lino dos Santos | [cite_start]Scrum Team [cite: 33] |
+| Giovanna Maria de Carvalho Camargo | [cite_start]Scrum Team [cite: 33] |
+| Luiz Henrique Silva Ferreira dos Santos | [cite_start]Scrum Team [cite: 33] |
+| Mauro Celestino Alves Junior | [cite_start]Scrum Team [cite: 33] |
+| Vinicius Willian de Araújo | [cite_start]Scrum Team [cite: 33] |
+| Prof. Me. Gildárcio Sousa Gonçalves | [cite_start]Orientador [cite: 28, 37] |
 
- |
-| Thierry Monteiro Assis Santos | Scrum Master 
-
- |
-| Adryel Luís Rodrigues | Scrum Team 
-
- |
-| Alessandra Danielle Lino dos Santos | Scrum Team 
-
- |
-| Giovanna Maria de Carvalho Camargo | Scrum Team 
-
- |
-| Luiz Henrique Silva Ferreira dos Santos | Scrum Team 
-
- |
-| Mauro Celestino Alves Junior | Scrum Team 
-
- |
-| Vinicius Willian de Araújo | Scrum Team 
-
- |
-| Prof. Me. Gildárcio Sousa Gonçalves | Orientador 
-
- |
-
-**Stakeholders:** Defesa Civil, Comunidade (Moradores), SAMU, Corpo de Bombeiros e Polícia Militar.
+[cite_start]**Stakeholders:** Defesa Civil, Comunidade (Moradores), SAMU, Corpo de Bombeiros e Polícia Militar[cite: 36].
 
 ---
 
 ## 2. Visão Geral e Objetivos
+[cite_start]O SMDN é uma plataforma bidirecional desenvolvida para atuar no monitoramento e comunicação de desastres naturais[cite: 43]. [cite_start]O foco principal do projeto é mitigar a falha na entrega de alertas para populações em áreas de risco e otimizar o tempo de resposta de órgãos de segurança e saúde[cite: 44, 51]. [cite_start]O sistema centraliza dados de fontes oficiais (INMET e CEMADEN) e os integra ao relato direto da comunidade (crowdsourcing)[cite: 45, 52].
 
-O SMDN é uma plataforma bidirecional focada na comunicação e monitoramento de áreas de risco. O foco é mitigar a falha na entrega de alertas e otimizar o tempo de resposta. O sistema une inteligência climática (fontes oficiais) ao relato direto da comunidade (crowdsourcing).
-
-**Objetivos Específicos:**
-
-* 
-**Fomento ao Crowdsourcing:** App móvel para relatos com fotos e captura de GPS.
-
-
-* 
-**Centralização de Ocorrências:** Painel Web seguro com mapa de calor em tempo real.
-
-
-* 
-**Comunicação Direcionada:** Alertas oficiais via push restritos a áreas de risco.
-
-
-* 
-**Inteligência de Dados:** Consumo de APIs do INMET e CEMADEN e lógica antifraude.
-
-
-* 
-**Auxílio Offline:** Perfil com dados médicos e manuais de sobrevivência offline.
-
-
+[cite_start]**Objetivos Específicos:** [cite: 56]
+* [cite_start]Fomento ao Crowdsourcing: disponibilizar um aplicativo móvel intuitivo para cidadãos relatarem ocorrências, anexando fotos e capturando coordenadas de geolocalização automaticamente[cite: 57, 58].
+* [cite_start]Centralização e Gestão de Ocorrências: criar um Painel Web seguro para autoridades com mapa de calor em tempo real[cite: 59].
+* [cite_start]Comunicação Direcionada: disparar alertas oficiais via notificações Push, restritos a áreas de risco selecionadas[cite: 60].
+* [cite_start]Inteligência e Integração de Dados Climáticos: consumir APIs do INMET e CEMADEN e desenvolver lógica antifraude[cite: 61].
+* [cite_start]Auxílio em Resgate e Prevenção: fornecer perfil com dados médicos vitais e manuais de sobrevivência acessíveis em modo offline[cite: 62].
 
 ---
 
-## 3. Arquitetura e Tecnologias
-
-* 
-**Flutter & Dart:** Desenvolvimento do App Mobile do cidadão com suporte nativo e cache offline.
-
-
-* 
-**React:** Construção do Painel Web das Autoridades com atualizações em tempo real (Realtime).
-
-
-* 
-**Supabase:** Backend-as-a-Service (BaaS) operando PostgreSQL, autenticação, armazenamento e websockets.
-
-
-* 
-**PostGIS:** Extensão espacial do PostgreSQL para cruzamento geográfico e mapas de calor.
-
-
-* 
-**Vercel:** Hospedagem e deploy contínuo do front-end.
-
-
-* 
-**GitHub:** Versionamento de código e feature branches.
-
-
-* 
-**Jira:** Gerenciamento ágil com mapeamento de sprints e product backlog.
-
-
+## [cite_start]3. Arquitetura e Tecnologias [cite: 63]
+* [cite_start]**Flutter & Dart:** App Mobile do Cidadão (multiplataforma, alto desempenho, cache offline, integração com Firebase Cloud Messaging)[cite: 66, 67, 68].
+* [cite_start]**React:** Painel Web das Autoridades (componentização, mapa de calor, atualizações em menos de 3 segundos via Realtime)[cite: 69, 70, 71].
+* [cite_start]**Supabase:** Backend, Banco de Dados e Autenticação (PostgreSQL, websockets, RLS, conformidade com LGPD)[cite: 72, 73, 74].
+* [cite_start]**PostGIS:** Extensão Geoespacial do PostgreSQL (armazenamento nativo de coordenadas, segmentação de alertas e filtro antifraude)[cite: 75, 77, 78].
+* [cite_start]**Vercel:** Hospedagem e Deploy Contínuo[cite: 79, 81].
+* [cite_start]**GitHub:** Versionamento e Colaboração[cite: 82, 83].
+* [cite_start]**Jira:** Gerenciamento Ágil com Scrum (boards de sprint, mapeamento de Épicos e User Stories)[cite: 84, 85, 87].
 
 ---
 
-## 4. Product Backlog
+## [cite_start]4. Product Backlog [cite: 89]
 
-### 4.1 Estrutura de Épicos (Epics)
+### [cite_start]4.1 Estrutura de Épicos [cite: 90]
+| ID | Nome do Épico | Descrição do Escopo |
+| :--- | :--- | :--- |
+| **EPIC-001** | App Mobile: Cidadão (Flutter) | [cite_start]Cadastro (CPF), UI/UX mobile, envio de relatos geolocalizados e recebimento de alertas push[cite: 91]. |
+| **EPIC-002** | Painel Web: Autoridades (React) | [cite_start]Autenticação de órgãos, dashboard em mapa (PostGIS) e gestão de ocorrências[cite: 91]. |
+| **EPIC-003** | Core de Negócio e Alertas | [cite_start]Lógica antifraude para evitar falsos positivos e consumo de dados INMET/CEMADEN[cite: 91]. |
+| **EPIC-004** | Infra e Banco de Dados (Supabase) | [cite_start]Configuração PostgreSQL/PostGIS, tabelas, autenticação base e API[cite: 91]. |
+| **EPIC-005** | Documentação e Entregas (PI) | [cite_start]Documentação de requisitos (MOSCOW), diagramas UML e preparação de relatórios[cite: 91]. |
 
-| ID | Épico | Descrição do Escopo |
-| --- | --- | --- |
-| **EPIC-001** | App Mobile: Cidadão (Flutter) | Cadastro (CPF), UI/UX mobile, envio de relatos com GPS e recebimento de alertas.
-
- |
-| **EPIC-002** | Painel Web: Autoridades (React) | Login de órgãos, mapa de calor (PostGIS) e gestão de ocorrências.
-
- |
-| **EPIC-003** | Core de Negócio e Alertas | Lógica antifraude (falsos positivos) e consumo INMET/CEMADEN.
-
- |
-| **EPIC-004** | Infra e Banco de Dados | Configuração PostgreSQL/PostGIS, tabelas, RBAC e API base.
-
- |
-| **EPIC-005** | Documentação e Entregas (PI) | Documentação, arquitetura UML e relatórios.
-
- |
-
-### 4.2 Histórias de Usuário (User Stories) e Tarefas Técnicas
-
-| ID | Épico Associado | Título / Descrição | Critério de Aceite |
-| --- | --- | --- | --- |
-| **US001** | EPIC-001 | Cadastro com CPF válido. | Bloquear CPF inválido; persistir dados válidos.
-
- |
-| **US002** | EPIC-001 | Envio de Relato com Foto. | Bloquear relato sem foto; permitir upload.
-
- |
-| **US003** | EPIC-001 | Captura Automática de GPS. | Coordenadas enviadas automaticamente com o relato.
-
- |
-| **US004** | EPIC-001 | Dicas de Sobrevivência (Offline). | Cache disponível integralmente sem internet.
-
- |
-| **US005** | EPIC-001 | Perfil com Dados Médicos. | Salvar e exibir tipo sanguíneo e alergias.
-
- |
-| **US006** | EPIC-002 | Autenticação de Órgãos Públicos. | Validar identidade contra cadastro de autoridades.
-
- |
-| **US007** | EPIC-002 | Mapa de Calor em Tempo Real. | Atualização do mapa em menos de 3 segundos.
-
- |
-| **US008** | EPIC-002 | Alertas Georreferenciados. | Enviar push apenas para usuários dentro da área desenhada.
-
- |
-| **US009** | EPIC-002 | Gestão de Permissões (RBAC). | Acesso exclusivo por funcionalidade definida ao papel.
-
- |
-| **US010** | EPIC-002 | Exportação de Histórico. | Exportar histórico em PDF e Excel (.xlsx).
-
- |
-| **US011** | EPIC-003 | Disparo Automático de Push. | Entrega via FCM em até 30s e registro de log.
-
- |
-| **US012** | EPIC-003 | Integração INMET/CEMADEN. | Atualização climática automática a cada 60 min.
-
- |
-| **US013** | EPIC-003 | Filtro Antifraude (Volume). | Bloquear alertas automáticos sem volume mínimo de relatos.
-
- |
-| **US014** | EPIC-003 | Log de Auditoria. | Log somente-leitura (append-only) com timestamp e ID.
-
- |
-| **TSK001** | EPIC-004 | Setup do PostGIS. | Banco persistindo coordenadas como geometria nativa.
-
- |
-| **TSK002** | EPIC-004 | Criptografia de Dados (LGPD). | Nenhuma senha/CPF armazenada em plaintext (ex: bcrypt).
-
- |
-| **TSK003** | EPIC-004 | Alta Disponibilidade (API). | Failover automático configurado com uptime igual/maior que 99,9%.
-
- |
+### [cite_start]4.2 Histórias de Usuário e Tarefas Técnicas [cite: 92, 104]
+| ID | Título | Critério de Aceite |
+| :--- | :--- | :--- |
+| **US001** | Cadastro de Cidadão | [cite_start]CPFs inválidos bloqueados; dados válidos persistidos no banco[cite: 94]. |
+| **US002** | Envio de Relato com Foto | [cite_start]O relato sem foto deve ser bloqueado; deve permitir upload[cite: 94]. |
+| **US003** | Captura Automática de GPS | [cite_start]Coordenadas Lat/Long devem ser enviadas automaticamente com o relato[cite: 94]. |
+| **US004** | Dicas de Sobrevivência (Offline) | [cite_start]Dicas cacheadas e disponíveis integralmente sem conexão[cite: 94]. |
+| **US005** | Perfil com Dados Médicos | [cite_start]Campos de tipo sanguíneo e alergias salvos e exibidos no perfil[cite: 94]. |
+| **US006** | Autenticação de Órgãos | [cite_start]Validação contra cadastro de autoridades; tentativas inválidas bloqueadas[cite: 96]. |
+| **US007** | Mapa de Calor em Tempo Real | [cite_start]Mapa atualizado automaticamente em menos de 3 segundos após novo relato[cite: 96]. |
+| **US008** | Alertas Georreferenciados | [cite_start]Apenas usuários na área selecionada no mapa recebem notificação push[cite: 96]. |
+| **US009** | Gestão de Permissões (RBAC) | [cite_start]Cada perfil acessa exclusivamente funções do seu papel; refletido imediatamente[cite: 96]. |
+| **US010** | Exportação de Histórico | [cite_start]Exportar ocorrências nos formatos PDF e Excel (.xlsx)[cite: 96]. |
+| **US011** | Disparo Automático de Push | [cite_start]Notificação entregue via FCM em até 30 segundos; registro de log[cite: 100]. |
+| **US012** | Integração INMET/CEMADEN | [cite_start]Atualização automática a cada 60 minutos; exibição de última atualização em falha[cite: 100]. |
+| **US013** | Filtro Antifraude | [cite_start]Cruzar GPS, tempo e distância; relatos abaixo do volume não geram alerta automático[cite: 100]. |
+| **US014** | Log de Auditoria | [cite_start]Registro somente-leitura (append-only) contendo ID, timestamp e ação inalteráveis[cite: 100]. |
+| **TSK001** | Setup do Banco e PostGIS | [cite_start]Banco online capaz de persistir coordenadas em geometria nativa PostGIS[cite: 105]. |
+| **TSK002** | Criptografia (LGPD) | [cite_start]Nenhuma senha ou CPF armazenado em plaintext (ex: uso de bcrypt)[cite: 105]. |
+| **TSK003** | Alta Disponibilidade (API) | [cite_start]Failover automático e monitoramento com disponibilidade igual ou superior a 99,9%[cite: 105]. |
 
 ---
 
-## 5. Especificações de Requisitos (Matriz de Rastreabilidade)
+## [cite_start]5. Especificação de Requisitos e Regras de Negócio [cite: 112, 115, 122]
+* [cite_start]**Prioridade:** Alto (Vital), Médio (Agrega Valor), Baixo (Desejável)[cite: 108, 110, 111].
 
-A priorização segue a lógica de: **A** (Alto / Vital), **M** (Médio / Agrega Valor), **B** (Baixo / Nice to Have).
+### 5.1 Requisitos Funcionais (RF) e Regras de Negócio (RN) associadas
+| ID | Prioridade | Descrição | Regra de Negócio Vinculada |
+| :--- | :--- | :--- | :--- |
+| **RF001** | Alto | [cite_start]Cadastro com validação de CPF[cite: 113]. | [cite_start]**RN001:** CPF válido, único na base[cite: 123]. |
+| **RF002** | Alto | [cite_start]Envio de relatos anexando fotos[cite: 113]. | [cite_start]**RN003:** Obrigatoriedade de evidência (fotografia)[cite: 123]. |
+| **RF003** | Alto | [cite_start]Captura automática de GPS[cite: 113]. | [cite_start]**RN002:** Relatos sem GPS válido não processados[cite: 123]. |
+| **RF004** | Alto | [cite_start]Login de órgãos públicos[cite: 113]. | [cite_start]**RN008:** Sem auto-cadastro; acesso provido pela administração[cite: 124]. |
+| **RF005** | Alto | [cite_start]Renderizar mapa de calor em tempo real[cite: 113]. | N/A |
+| **RF006** | Médio | [cite_start]Disparo de alertas georreferenciados[cite: 113]. | [cite_start]**RN005 / RN006:** Ação exclusiva de autoridade enviada para dispositivos no polígono desenhado[cite: 124]. |
+| **RF007** | Médio | [cite_start]Disparo automático push via FCM[cite: 114]. | N/A |
+| **RF008** | Médio | [cite_start]Integração INMET/CEMADEN[cite: 114]. | N/A |
+| **RF009** | Médio | [cite_start]Filtro antifraude de volume e tempo[cite: 114]. | [cite_start]**RN004:** Relatos fisicamente improváveis ocultados do mapa até validação manual[cite: 123]. |
+| **RF010** | Médio | [cite_start]Gestão de Permissões (RBAC)[cite: 114]. | N/A |
+| **RF011** | Médio | [cite_start]Log de Auditoria[cite: 114]. | [cite_start]**RN007:** Registro de ações inalterável (append-only)[cite: 124]. |
+| **RF012** | Baixo | [cite_start]Exportação do histórico de ocorrências[cite: 114]. | N/A |
+| **RF013** | Baixo | [cite_start]Perfil de usuário com dados médicos[cite: 114]. | N/A |
+| **RF014** | Baixo | [cite_start]Guia de sobrevivência em modo offline[cite: 114]. | N/A |
 
-### 5.1 Requisitos Funcionais (RF) e Regras de Negócio (RN)
-
-| Ref. | Prioridade | Descrição do Requisito | Regra de Negócio Associada (RN) |
-| --- | --- | --- | --- |
-| **RF001** | Alto | Cadastro de cidadão com validação de CPF.
-
- | <br>**RN001**: CPF deve ser válido e único.
-
- |
-| **RF002** | Alto | Envio de relatos anexando fotos.
-
- | <br>**RN003**: Relato exige no mínimo uma foto anexada.
-
- |
-| **RF003** | Alto | Captura automática do GPS no relato.
-
- | <br>**RN002**: Relato não processado sem coordenadas GPS.
-
- |
-| **RF004** | Alto | Login exclusivo para órgãos públicos.
-
- | <br>**RN008**: Sem auto-cadastro; acesso via credencial da administração.
-
- |
-| **RF005** | Alto | Mapa de calor renderizado em tempo real.
-
- | (Integrado com US007). |
-| **RF006** | Médio | Autoridades disparam alertas baseados em área.
-
- | <br>**RN005 / RN006**: Disparo exclusivo de "Autoridade Pública" focado estritamente no polígono desenhado.
-
- |
-| **RF007** | Médio | Disparo automático via FCM.
-
- | (Integrado com TSK003). |
-| **RF008** | Médio | Consumo da API INMET/CEMADEN.
-
- | (Integrado com US012). |
-| **RF009** | Médio | Filtro de volume e tempo antifraude.
-
- | <br>**RN004**: Ocultar do mapa relatos que excedam limite de velocidade/distância ou tempo improvável até validação manual.
-
- |
-| **RF010** | Médio | Gestão de perfis (RBAC).
-
- | (Integrado com US009). |
-| **RF011** | Médio | Log de Auditoria de alertas.
-
- | <br>**RN007**: Registro inalterável (append-only) de ações críticas.
-
- |
-| **RF012** | Baixo | Exportação de Histórico.
-
- | (Integrado com US010). |
-| **RF013** | Baixo | Perfil de usuário com informações médicas.
-
- | (Integrado com US005). |
-| **RF014** | Baixo | Guias de sobrevivência offline no mobile.
-
- | (Integrado com US004). |
-
-### 5.2 Requisitos Não Funcionais (RNF)
-
+### [cite_start]5.2 Requisitos Não Funcionais (RNF) [cite: 116, 118]
 | ID | Categoria | Prioridade | Descrição |
-| --- | --- | --- | --- |
-| **RNF001** | Segurança | Alto | Criptografia de dados sensíveis conforme LGPD.
+| :--- | :--- | :--- | :--- |
+| **RNF001** | Segurança | Alto | [cite_start]Criptografia de dados sensíveis conforme exigências da LGPD[cite: 118]. |
+| **RNF002** | Armazenamento | Alto | [cite_start]Banco utilizar extensão PostGIS para dados espaciais[cite: 118]. |
+| **RNF003** | Portabilidade | Alto | [cite_start]App multiplataforma construído com Flutter[cite: 118]. |
+| **RNF004** | Usabilidade | Alto | [cite_start]Interface implementada com recursos de Alta Acessibilidade[cite: 118]. |
+| **RNF005** | Arquitetura | Médio | [cite_start]Comunicação entre Front e Back suportando Real-time[cite: 118, 120]. |
+| **RNF006** | Disponibilidade | Baixo | [cite_start]API do backend com garantias estruturais de Alta Disponibilidade[cite: 121]. |
 
- |
-| **RNF002** | Armazenamento | Alto | Uso da extensão PostGIS no Supabase para dados espaciais.
-
- |
-| **RNF003** | Portabilidade | Alto | App mobile multiplataforma construído com Flutter.
-
- |
-| **RNF004** | Acessibilidade | Alto | Interface implementada com recursos de Alta Acessibilidade.
-
- |
-| **RNF005** | Arquitetura | Médio | Comunicação entre Front e Back suportando Real-time.
-
- |
-| **RNF006** | Disponibilidade | Baixo | Backend com garantias estruturais de Alta Disponibilidade.
-
- |
-
-### 5.3 Requisitos Inversos (RI)
-
-O que o sistema estritamente **não deve** fazer:
-
-* 
-**RI-001 (Alto):** Não realiza cadastro de cidadãos sem CPF válido.
-
-
-* 
-**RI-002 (Alto):** Não permite acesso administrativo por usuários comuns.
-
-
-* 
-**RI-003 (Alto):** Não armazena dados sensíveis em texto puro.
-
-
-* 
-**RI-004 (Alto):** Não trata dados geográficos como dados comuns (exige suporte espacial).
-
-
-* 
-**RI-005 (Médio):** Não dispara alertas sem delimitação geográfica.
-
-
-* 
-**RI-006 (Médio):** Não considera todos os relatos como confiáveis sem passar por análise.
-
-
-* 
-**RI-007 (Médio):** Não permite ações críticas sem registro de rastreabilidade e autoria.
-
-
-* 
-**RI-008 (Baixo):** Não depende exclusivamente de internet para carregar o guia de sobrevivência.
-
-
+### [cite_start]5.3 Requisitos Inversos (RI) [cite: 126]
+| ID | Origem | Prioridade | Descrição (O sistema NÃO deve...) |
+| :--- | :--- | :--- | :--- |
+| **RI-001** | RF-001 | Alto | [cite_start]Realizar cadastro de cidadãos sem CPF válido[cite: 128]. |
+| **RI-002** | RF-004 | Alto | [cite_start]Permitir acesso administrativo por usuários comuns[cite: 128]. |
+| **RI-003** | RNF-001 | Alto | [cite_start]Armazenar dados sensíveis em texto puro[cite: 128]. |
+| **RI-004** | RNF-002 | Alto | [cite_start]Tratar dados geográficos como dados comuns sem suporte espacial[cite: 128]. |
+| **RI-005** | RF-006 | Médio | [cite_start]Disparar alertas sem delimitação geográfica da área[cite: 128]. |
+| **RI-006** | RF-009 | Médio | [cite_start]Considerar todos os relatos como confiáveis sem análise automatizada[cite: 128]. |
+| **RI-007** | RF-011 | Médio | [cite_start]Permitir ações críticas sem registro de autoria e rastreabilidade[cite: 128]. |
+| **RI-008** | RF-014 | Baixo | [cite_start]Depender exclusivamente de conexão para disponibilizar o guia de sobrevivência[cite: 128]. |
 
 ---
 
-## 6. Histórico e Planejamento de Sprints
-
-| Data | Versão / Evento | Descrição / Autoria |
-| --- | --- | --- |
-| 12/03/2026 | - | Sprint Planning: Início do planejamento (Equipe Completa).
-
- |
-| 14/03/2026 | 1.0 | Criação inicial do documento (Autor: Humberto).
-
- |
-| 26/03/2026 | - | Sprint Planning: Definição de requisitos e tecnologias.
-
- |
-| 29/03/2026 | 1.1 e 1.2 | Ajustes de equipe e implementação de Requisitos Inversos (Autores: Humberto e Thierry).
-
- |
-| 13/04/2026 | - | Sprint Planning: Refinamento da documentação.
-
- |
-| 16/04/2026 | - | Sprint Planning: Início do desenvolvimento da aplicação mobile.
-
- |
-| 23/04/2026 | 1.3 | Implementação UML e consolidação (Autor: Humberto).
-
- |
+## [cite_start]6. Histórico de Revisões e Sprints [cite: 38, 40]
+| Data | Versão | Descrição | Participantes/Autor |
+| :--- | :--- | :--- | :--- |
+| 12/03/2026 | 1 | [cite_start]Início do planejamento do projeto[cite: 39]. | [cite_start]Humberto, Thierry, Mauro, Alessandra, Giovanna, Adryel, Luiz e Vinicius[cite: 39]. |
+| 14/03/2026 | 1.0 | [cite_start]Criação inicial do documento de requisitos[cite: 41]. | [cite_start]Humberto[cite: 41]. |
+| 26/03/2026 | 1 | [cite_start]Definição de requisitos e tecnologias[cite: 39]. | [cite_start]Humberto, Thierry, Mauro, Alessandra, Giovanna, Adryel e Vinicius[cite: 39]. |
+| 29/03/2026 | 1.1 / 1.2 | [cite_start]Ajustes de equipe e implementação de requisitos inversos[cite: 41]. | [cite_start]Humberto e Thierry[cite: 41]. |
+| 13/04/2026 | 1 | [cite_start]Refinamento da documentação do projeto[cite: 39]. | [cite_start]Humberto, Thierry, Mauro, Alessandra, Giovanna, Adryel e Vinicius[cite: 39]. |
+| 16/04/2026 | 1 | [cite_start]Início do desenvolvimento da aplicação mobile[cite: 39]. | [cite_start]Humberto, Thierry, Mauro, Alessandra, Giovanna, Adryel e Vinicius[cite: 39]. |
+| 23/04/2026 | 1.3 | [cite_start]Implementação dos diagramas UML e consolidação[cite: 41]. | [cite_start]Humberto[cite: 41]. |
