@@ -1,5 +1,3 @@
-//Fazzer revisão
-
 import { NavLink } from "react-router-dom";
 import logoWeb from "../assets/logoweb.svg";
 
@@ -17,7 +15,7 @@ const links = [
 export default function Menu() {
   return (
     <aside className="menu-sidebar" aria-label="Menu principal">
-      <div className="brand" aria-label="SMAN">
+      <div className="brand" aria-label="SMDN">
         <img className="brand-logo" src={logoWeb} alt="Logo SMDN" />
         <span className="brand-mark" aria-hidden="true">
           <span className="brand-mountain" />
@@ -30,8 +28,8 @@ export default function Menu() {
       <nav className="menu-nav">
         {links.map((link) => (
           <NavLink
-            key={link.to}
-            to={link.to}
+            key={link.path}
+            to={link.path}
             className={({ isActive }) => `menu-link ${isActive ? "is-active" : ""}`}
           >
             {({ isActive }) => (
