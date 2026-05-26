@@ -1,3 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=K2D:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap');
+
+:root {
+  font-family: "K2D", sans-serif;
+  --bg-main: #e4e8eb;     /* Fundo geral das telas */
+  --bg-sidebar: #09162e;     /* Sidebar e fundo da tela */
+  --bg-surface: #ffffff;     /* Cards, modais e tabelas */
+  --text-main: #44769b;     /* Cor principal dos textos */
+  --text-on-dark: #a6c1d4;     /* Textos sobre o fundo escuro */
+  --action-inactive: #18395c;     /* Inativos */
+  --status-critical: #c60202;     /* Severidade alta */
+  --status-severe: #ff6a00;     /* Severidade média */
+  --status-regulae: #cab900;     /* Severidade moderada */
+  --status-sucess: #02c602;     /* resolvido/sucesso */
+}
+
 .reportar {
   min-height: 100vh;
   background: #f5f7fb;
