@@ -1,0 +1,11 @@
+{
+  "name": "projeto-integrador-smdn",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "vite": "^8.0.14"
+  }
+}
