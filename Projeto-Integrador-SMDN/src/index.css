@@ -69,15 +69,12 @@
 }
 
 .notification-btn {
-  background: white;
+  background: var(--bg-surface);
   border: none;
-
   width: 50px;
   height: 50px;
-
   border-radius: 12px;
   cursor: pointer;
-
   box-shadow: 0 2px 8px rgba(0,0,0,.05);
 }
 
@@ -234,15 +231,15 @@
   align-items: center;
   gap: 9px;
   border-radius: 24px;
-  color: #18395c;
+  color: var(--action-inactives);
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
 
-.menu-link:hover {
-  color: #a6c1d4;
+.menu-link::hover {
+  color: var(--text-on-dark);
 }
 
 .menu-link.is-active {
