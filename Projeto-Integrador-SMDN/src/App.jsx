@@ -1,4 +1,5 @@
 import "./App.css";
+import Dashboard from "./pages/dashboard.jsx";
 import StatsCard from "./components/StatsCard";
 import Menu from "./components/Menu.jsx";
 
