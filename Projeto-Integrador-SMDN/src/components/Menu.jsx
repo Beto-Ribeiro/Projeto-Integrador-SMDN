@@ -4,12 +4,12 @@ import logoWeb from "../assets/menu/logoweb.svg";
 const iconPath = "/icons/menu";
 
 const links = [
-  { label: "Dashboard", path: "/dashboard", icon: "map-pin.svg" },
-  { label: "Reportar", path: "/reportar", icon: "flag.svg" },
-  { label: "Ocorrências", path: "/ocorrencias", icon: "alert-triangle.svg" },
-  { label: "Relatórios", path: "/relatorios", icon: "pie-chart.svg" },
-  { label: "Auditoria", path: "/auditoria", icon: "lock.svg" },
-  { label: "Perfil", path: "/perfil", icon: "user.svg" },
+  { label: "Dashboard", path: "/dashboard", icon: "../assets/menu/inativo/map-pin.svg" },
+  { label: "Reportar", path: "/reportar", icon: "../assets/menu/inativo/flag.svg" },
+  { label: "Ocorrências", path: "/ocorrencias", icon: "../assets/menu/inativo/alert-triangle.svg" },
+  { label: "Relatórios", path: "/relatorios", icon: "../assets/menu/inativo/pie-chart.svg" },
+  { label: "Auditoria", path: "/auditoria", icon: "../assets/menu/inativo/lock.svg" },
+  { label: "Perfil", path: "/perfil", icon: "../assets/menu/inativo/user.svg" },
 ];
 
 export default function Menu() {
