@@ -1,4 +1,5 @@
 import AlertCard from "../components/AlertCard";
+import Header from "../components/Header";
 import "./reportar.css";
 
 const alertas = [
@@ -37,12 +38,7 @@ const alertas = [
 function Reportar() {
   return (
     <main className="reportar">
-      <header className="report-header">
-        <div>
-          <h1>Reportar</h1>
-          <p>Gerencie e visualize os alertas emitidos</p>
-        </div>
-      </header>
+      <Header ativos="4" notificacoes="97.640" />
 
       <section className="alerts">
         {alertas.map((alerta, i) => (
