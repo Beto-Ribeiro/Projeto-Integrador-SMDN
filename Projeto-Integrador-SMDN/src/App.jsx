@@ -1,8 +1,10 @@
 import "./App.css";
 import StatsCard from "./components/StatsCard";
+import Menu from "./components/Menu.jsx";
 
 function App() {
   return (
+
     <main className="dashboard">
       <h1>Dashboard</h1>
 
