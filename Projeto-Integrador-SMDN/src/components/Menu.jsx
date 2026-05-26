@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import logoWeb from "../assets/logoweb.svg";
+import logoWeb from "../assets/menu/logoweb.svg";
 
 const iconPath = "/icons/menu";
 
@@ -17,12 +17,6 @@ export default function Menu() {
     <aside className="menu-sidebar" aria-label="Menu principal">
       <div className="brand" aria-label="SMDN">
         <img className="brand-logo" src={logoWeb} alt="Logo SMDN" />
-        <span className="brand-mark" aria-hidden="true">
-          <span className="brand-mountain" />
-          <span className="brand-wave brand-wave-one" />
-          <span className="brand-wave brand-wave-two" />
-        </span>
-        <span className="brand-text brand-last">N</span>
       </div>
 
       <nav className="menu-nav">

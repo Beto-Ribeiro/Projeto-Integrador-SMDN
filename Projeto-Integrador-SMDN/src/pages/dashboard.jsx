@@ -1,7 +1,7 @@
     import StatsCard from "../components/StatsCard";
     import AlertCard from "../components/AlertCard";
     import Header from "../components/Header";
-    import "./Dashboard.css";
+    import "./dashboard.css";
 
     
 function Dashboard() {

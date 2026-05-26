@@ -1,31 +1,19 @@
-import "./App.css";
-import Dashboard from "./pages/dashboard.jsx";
-import StatsCard from "./components/StatsCard";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Menu from "./components/Menu.jsx";
+import Dashboard from "./pages/dashboard.jsx";
+import "./App.css";
 
 function App() {
   return (
-
-    <main className="dashboard">
-      <h1>Dashboard</h1>
-
-      <section className="cards">
-        <StatsCard
-          title="Alertas Ativos"
-          value="4"
-        />
-
-        <StatsCard
-          title="Notificações"
-          value="97.640"
-        />
-
-        <StatsCard
-          title="Ocorrências"
-          value="12"
-        />
-      </section>
-    </main>
+    <div className="app-shell">
+      <Menu />
+      <div className="page-content">
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Routes>
+      </div>
+    </div>
   );
 }
 
