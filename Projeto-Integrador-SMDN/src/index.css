@@ -2,6 +2,16 @@
 
 :root {
   font-family: "K2D", sans-serif;
+  --bg-main: #e4e8eb;     /* Fundo geral das telas */
+  --bg-sidebar: #09162e;     /* Sidebar e fundo da tela */
+  --bg-surface: #ffffff;     /* Cards, modais e tabelas */
+  --text-main: #44769b;     /* Cor principal dos textos */
+  --text-on-dark: #a6c1d4;     /* Textos sobre o fundo escuro */
+  --action-inactive: #18395c;     /* Inativos */
+  --status-critical: #c60202;     /* Severidade alta */
+  --status-severe: #ff6a00;     /* Severidade média */
+  --status-regulae: #cab900;     /* Severidade moderada */
+  --status-sucess: #02c602;     /* resolvido/sucesso */
 }
 
 .alerts {
@@ -13,7 +23,7 @@
 }
 
 .alert-card {
-  background: white;
+  background: var(--bg-surface);
   padding: 20px;
 
   border-radius: 15px;
@@ -32,8 +42,8 @@
 }
 
 .risk {
-  background: red;
-  color: white;
+  background: var(--status-critical);
+  color: var(--bg-surface);
 
   padding: 5px 12px;
   border-radius: 999px;
@@ -111,7 +121,7 @@
 }
 
 .alert-card {
-  background: white;
+  background: var(--bg-surface);
   border-radius: 16px;
 
   padding: 20px;
@@ -120,8 +130,8 @@
 }
 
 .risk {
-  background: #dc2626;
-  color: white;
+  background: var(--status-critical);
+  color: var(--bg-surface);
 
   border-radius: 999px;
 
@@ -135,8 +145,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  background: #06152d;
-  color: #18395c;
+  background: var(--bg-sidebar);
+  color: var(--text-on-dark);
   overflow: hidden;
 }
 
@@ -147,9 +157,7 @@
   display: flex;
   align-items: center;
   padding: 12px 16px 28px;
-  background: #06152d;
   border-bottom-right-radius: 22px;
-  color: #5f8eb5;
   font-size: 42px;
   font-weight: 400;
   line-height: 1;
