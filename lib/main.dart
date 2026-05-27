@@ -39,7 +39,7 @@ class _MyAppState extends State<MyApp>{
           ),
         ),
 
-        home: Home_Tela(title: "Home"),
+        home: Home(title: "Home"),
     );
   }
 }

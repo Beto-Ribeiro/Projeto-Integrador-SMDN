@@ -32,7 +32,7 @@ class _Home_State extends State<Home> {
             verticalDirection: VerticalDirection.up,
 
             children: [
-              Container(
+              /*Container(
                 width: double.infinity,
                 height: 90,
                 decoration: BoxDecoration(color: Color.fromRGBO(9, 22, 46, 1)),
@@ -85,7 +85,7 @@ class _Home_State extends State<Home> {
                     ),
                   ],
                 ),
-              ),
+              ),*/
               SingleChildScrollView(
                 child: Container(
                   width: double.infinity,
@@ -147,7 +147,8 @@ class _Home_State extends State<Home> {
                         ),
                       ),
                       SizedBox(
-                        height: 160,
+                        height: 300,
+                        width: double.infinity,
                       ),
                     ],
                   ),
