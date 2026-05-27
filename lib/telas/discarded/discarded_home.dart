@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'exportador_import.dart';
+import '../exportador_import.dart';
 
 class Home_Tela extends StatefulWidget {
   const Home_Tela({
@@ -49,7 +49,6 @@ class _Home_TelaState extends State<Home_Tela> {
                           'gfx/svg/icons/User_Icon.svg',
                           width: double.infinity,
                           height: double.infinity,
-
                           fit: BoxFit.cover,
                         ),
                       ),

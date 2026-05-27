@@ -1,5 +1,4 @@
-
-import 'package:branch1/telas/home.dart';
+import 'package:branch1/telas/discarded/discarded_home.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -16,19 +15,31 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+
+  @override
+  State<MyApp> createState()=> _MyAppState();
+}
+
+class _MyAppState extends State<MyApp>{
+
+  bool estalogado = false;
+  bool telahome = false;
+  bool telareport = false;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blueAccent,
+        title: 'Flutter Demo',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.blueAccent,
+          ),
         ),
-      ),
-      home: const Home_Tela(title: 'Aplicativo'),
+
+        home: Home_Tela(title: "Home"),
     );
   }
 }

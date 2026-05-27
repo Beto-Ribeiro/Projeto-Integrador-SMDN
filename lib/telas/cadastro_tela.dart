@@ -3,11 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'exportador_import.dart';
+import 'package:branch1/main.dart';
 
 class Cadastro_tela extends StatefulWidget {
+  final bool estalogado;
+  final bool telahome;
+  final bool telareport;
+
   const Cadastro_tela({
     super.key,
     required this.title,
+    required this.estalogado,
+    required this.telahome,
+    required this.telareport,
+
   });
 
   final String title;
@@ -142,6 +151,7 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
           ),
         ),
       );
+
     } catch (e) {
       print(e);
 
@@ -406,7 +416,7 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
                     ),
 
                     child: Image.asset(
-                      "imagens/SMDN png.png",
+                      "gfx/png/Image/SMDN.png",
                       height: 60,
                     ),
                   ),
