@@ -13,7 +13,7 @@ void main() async {
     anonKey: 'sb_publishable_eVCeoqzfhoAgkpBnJxzs7w_-PGO0TO9',
   );
 
-  runApp(const MyApp());
+  runApp( MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
           seedColor: Colors.blueAccent,
         ),
       ),
-      home: const Relatos_tela(title: 'maco'),
+      home:Relatos_tela (title: 'maco'),
     );
   }
 }
