@@ -28,13 +28,14 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
-  flutter:
-    sdk: flutter
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  flutter_svg: ^2.2.4
-  supabase_flutter: ^2.12.4
+    flutter:
+      sdk: flutter
+    flutter_dotenv: ^6.0.1
+    geolocator: ^14.0.2
+    google_maps_flutter: ^2.5.3 # Verifique a versão mais atual no pub.dev
+    permission_handler: ^12.0.1
+    flutter_svg: ^2.2.4
+    supabase_flutter: ^2.12.4
 
 dev_dependencies:
   flutter_test:
@@ -53,17 +54,17 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
 
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
   assets:
+    - .env
     - gfx/png/icons/
     - gfx/png/Image/
     - gfx/svg/icons/
     - gfx/svg/Image/
     - gfx/diverse_types/
-
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
-  uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
   # assets:
