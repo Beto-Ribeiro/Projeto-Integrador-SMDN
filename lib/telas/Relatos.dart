@@ -1,8 +1,28 @@
 import 'dart:typed_data';
 
+import 'package:branch1/telas/exportador_import.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+void main() async {
+
+  WidgetsFlutterBinding.ensureInitialized();
+
+
+
+  runApp(
+
+    const MaterialApp(
+
+      debugShowCheckedModeBanner: false,
+
+      home: Relatos_tela(
+        title: '',
+      ),
+    ),
+  );
+}
 
 class Relatos_tela extends StatefulWidget {
 
@@ -33,7 +53,7 @@ class _Relatos_telaState
 
   Future<void> selecionarImagem() async {
 
-    final resultado =
+    FilePickerResult? resultado =
     await FilePicker.platform.pickFiles(
 
       type: FileType.image,
@@ -63,12 +83,9 @@ class _Relatos_telaState
       final supabase =
           Supabase.instance.client;
 
-      print(
-        supabase.auth.currentUser,
-      );
-
       if (tipoSelecionado == null ||
           nivelSelecionado == null ||
+          imagemSelecionada == null ||
           imagemBytes == null) {
 
         ScaffoldMessenger.of(context)
@@ -77,7 +94,7 @@ class _Relatos_telaState
           const SnackBar(
 
             content: Text(
-              'Preencha todos os campos',
+              'Preencha todos os campos.',
             ),
           ),
         );
@@ -143,6 +160,9 @@ class _Relatos_telaState
         'rel_descricao':
         nivelRisco,
 
+        'rel_user_id':
+        'd5915095-8664-495d-a24f-f2d3a2dcf652',
+
       })
 
           .select()
@@ -156,17 +176,17 @@ class _Relatos_telaState
 
           '${DateTime.now().millisecondsSinceEpoch}.png';
 
-      final caminhoImagem =
+      final path =
 
           'relatos/$relatoId/$nomeArquivo';
 
       await supabase.storage
 
-          .from('Foto_Storage')
+          .from('fotos')
 
           .uploadBinary(
 
-        caminhoImagem,
+        path,
 
         imagemBytes!,
 
@@ -174,15 +194,15 @@ class _Relatos_telaState
 
       await supabase
 
-          .from('Foto')
+          .from('Fotos')
 
           .insert({
 
         'rel_id':
         relatoId,
 
-        'fot_url':
-        caminhoImagem,
+        'foto_path':
+        path,
 
       });
 
@@ -192,7 +212,7 @@ class _Relatos_telaState
         const SnackBar(
 
           content: Text(
-            'Relato enviado com sucesso',
+            'Relato enviado com sucesso!',
           ),
         ),
       );
@@ -212,114 +232,6 @@ class _Relatos_telaState
         ),
       );
     }
-  }
-
-  Widget radioTipo(
-      int valor,
-      String texto,
-      ) {
-
-    return Column(
-
-      children: [
-
-        GestureDetector(
-
-          onTap: () {
-
-            setState(() {
-
-              tipoSelecionado = valor;
-
-            });
-          },
-
-          child: Container(
-
-            width: 24,
-            height: 24,
-
-            decoration: BoxDecoration(
-
-              shape: BoxShape.circle,
-
-              color:
-
-              tipoSelecionado == valor
-
-                  ? Colors.blue
-
-                  : Colors.transparent,
-
-              border: Border.all(
-
-                color: Colors.blue,
-
-                width: 2,
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 5),
-
-        Text(texto),
-      ],
-    );
-  }
-
-  Widget nivelBox(
-      int valor,
-      Color cor,
-      String texto,
-      ) {
-
-    return Column(
-
-      children: [
-
-        GestureDetector(
-
-          onTap: () {
-
-            setState(() {
-
-              nivelSelecionado = valor;
-
-            });
-          },
-
-          child: Container(
-
-            width: 24,
-            height: 24,
-
-            decoration: BoxDecoration(
-
-              color:
-
-              nivelSelecionado == valor
-
-                  ? cor
-
-                  : Colors.transparent,
-
-              border: Border.all(
-                color: cor,
-                width: 2,
-              ),
-
-              borderRadius:
-              BorderRadius.circular(5),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 5),
-
-        Text(texto),
-      ],
-    );
   }
 
   @override
@@ -353,6 +265,8 @@ class _Relatos_telaState
 
                     fontWeight:
                     FontWeight.bold,
+
+                    color: Colors.black,
                   ),
                 ),
 
@@ -366,14 +280,17 @@ class _Relatos_telaState
 
                     width: double.infinity,
 
-                    height: 180,
+                    height: 150,
 
                     decoration: BoxDecoration(
 
-                      border: Border.all(),
+                      border: Border.all(
+                        color: Colors.black,
+                      ),
 
                       borderRadius:
                       BorderRadius.circular(8),
+
                     ),
 
                     child: imagemBytes == null
@@ -381,14 +298,14 @@ class _Relatos_telaState
                         ? const Center(
 
                       child: Text(
-                        'Selecionar imagem',
+                        'Insira uma imagem',
                       ),
                     )
 
                         : ClipRRect(
 
                       borderRadius:
-                      BorderRadius.circular(8),
+                      BorderRadius.circular(7),
 
                       child: Image.memory(
 
@@ -404,14 +321,16 @@ class _Relatos_telaState
 
                 const Text(
 
-                  'Tipo de desastre',
+                  'Escolha o tipo de desastre:',
 
                   style: TextStyle(
 
-                    fontSize: 18,
+                    fontSize: 20,
 
                     fontWeight:
                     FontWeight.bold,
+
+                    color: Colors.black54,
                   ),
                 ),
 
@@ -420,29 +339,46 @@ class _Relatos_telaState
                 Row(
 
                   mainAxisAlignment:
-                  MainAxisAlignment.spaceEvenly,
+                  MainAxisAlignment.center,
 
                   children: [
 
-                    radioTipo(
-                      0,
-                      'Enchente',
-                    ),
+                    radioTipo(0),
 
-                    radioTipo(
-                      1,
-                      'Ciclone',
-                    ),
+                    const SizedBox(width: 10),
 
-                    radioTipo(
-                      2,
-                      'Deslizamento',
-                    ),
+                    radioTipo(1),
 
-                    radioTipo(
-                      3,
-                      'Chuva Forte',
-                    ),
+                    const SizedBox(width: 10),
+
+                    radioTipo(2),
+
+                    const SizedBox(width: 10),
+
+                    radioTipo(3),
+
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                const Wrap(
+
+                  alignment:
+                  WrapAlignment.center,
+
+                  spacing: 10,
+
+                  children: [
+
+                    Text('Enchente'),
+
+                    Text('Ciclone'),
+
+                    Text('Deslizamento'),
+
+                    Text('Chuva Forte'),
+
                   ],
                 ),
 
@@ -450,14 +386,16 @@ class _Relatos_telaState
 
                 const Text(
 
-                  'Nível de risco',
+                  'Classifique o risco:',
 
                   style: TextStyle(
 
-                    fontSize: 18,
+                    fontSize: 20,
 
                     fontWeight:
                     FontWeight.bold,
+
+                    color: Colors.black54,
                   ),
                 ),
 
@@ -466,38 +404,46 @@ class _Relatos_telaState
                 Row(
 
                   mainAxisAlignment:
-                  MainAxisAlignment.spaceEvenly,
+                  MainAxisAlignment.center,
 
                   children: [
 
                     nivelBox(
                       0,
-                      Colors.yellow,
-                      '1',
+                      Colors.yellowAccent,
+                      "1",
                     ),
+
+                    const SizedBox(width: 15),
 
                     nivelBox(
                       1,
                       Colors.orangeAccent,
-                      '2',
+                      "2",
                     ),
+
+                    const SizedBox(width: 15),
 
                     nivelBox(
                       2,
                       Colors.orange,
-                      '3',
+                      "3",
                     ),
+
+                    const SizedBox(width: 15),
 
                     nivelBox(
                       3,
                       Colors.deepOrange,
-                      '4',
+                      "4",
                     ),
+
+                    const SizedBox(width: 15),
 
                     nivelBox(
                       4,
                       Colors.red,
-                      '5',
+                      "5",
                     ),
                   ],
                 ),
@@ -517,6 +463,115 @@ class _Relatos_telaState
           ),
         ),
       ),
+    );
+  }
+
+  Widget radioTipo(int valor) {
+
+    return GestureDetector(
+
+      onTap: () {
+
+        setState(() {
+
+          tipoSelecionado = valor;
+
+        });
+      },
+
+      child: Container(
+
+        width: 24,
+        height: 24,
+
+        decoration: BoxDecoration(
+
+          shape: BoxShape.circle,
+
+          color:
+
+          tipoSelecionado == valor
+
+              ? Colors.blue
+
+              : Colors.transparent,
+
+          border: Border.all(
+
+            color: Colors.blue,
+
+            width: 2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget nivelBox(
+
+      int valor,
+      Color cor,
+      String texto,
+
+      ) {
+
+    return Column(
+
+      children: [
+
+        GestureDetector(
+
+          onTap: () {
+
+            setState(() {
+
+              nivelSelecionado = valor;
+
+            });
+          },
+
+          child: Container(
+
+            width: 24,
+            height: 24,
+
+            decoration: BoxDecoration(
+
+              borderRadius:
+              BorderRadius.circular(5),
+
+              color:
+
+              nivelSelecionado == valor
+
+                  ? cor
+
+                  : Colors.transparent,
+
+              border: Border.all(
+
+                color: cor,
+
+                width: 2,
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 4),
+
+        Text(
+
+          texto,
+
+          style: TextStyle(
+
+            fontSize: 12,
+
+            color: cor,
+          ),
+        ),
+      ],
     );
   }
 }
