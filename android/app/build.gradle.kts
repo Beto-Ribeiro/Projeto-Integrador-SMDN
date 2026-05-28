@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.smdn.mobile"
+    namespace = "com.example.branch1"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
