@@ -6,17 +6,12 @@ import 'exportador_import.dart';
 import 'package:branch1/main.dart';
 
 class Cadastro_tela extends StatefulWidget {
-  final bool estalogado;
-  final bool telahome;
-  final bool telareport;
+  final Function(int) onChangePage;
 
   const Cadastro_tela({
     super.key,
     required this.title,
-    required this.estalogado,
-    required this.telahome,
-    required this.telareport,
-
+    required this.onChangePage,
   });
 
   final String title;
@@ -152,6 +147,8 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
         ),
       );
 
+      widget.onChangePage(0);
+
     } catch (e) {
       print(e);
 
@@ -215,6 +212,9 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
                       50,
                     ),
                     width: double.infinity,
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.of(context).size.height,
+                    ),
                     decoration: const BoxDecoration(
                       color: Colors.white,
 
@@ -345,9 +345,11 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
 
                                 children: [
                                   Text(
-                                    _dateTime.day.toString() + "/" +
-                                    _dateTime.month.toString() + "/" +
-                                    _dateTime.year.toString(),
+                                    _dateTime.day.toString() +
+                                        "/" +
+                                        _dateTime.month.toString() +
+                                        "/" +
+                                        _dateTime.year.toString(),
                                     style: TextStyle(color: Colors.black),
                                   ),
                                 ],
@@ -392,18 +394,17 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
 
                           child: _estaCarregando
                               ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : const Text(
-                            'Enviar',
-                          ),
+                                  'Enviar',
+                                ),
                         ),
                       ],
-
                     ),
                   ),
 
@@ -420,9 +421,7 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
                       height: 60,
                     ),
                   ),
-
                 ],
-
               ),
             ),
           ),

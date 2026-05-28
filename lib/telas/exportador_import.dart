@@ -1,5 +1,8 @@
+export 'package:flutter/material.dart';
+export 'package:flutter_svg/flutter_svg.dart';
 export 'formatadores/background_abs_code.dart';
 export 'formatadores/reponsive.dart';
+export 'formatadores/default_widgets.dart';
 export 'Home.dart';
 export 'package:branch1/main.dart';
 export 'tela_principal.dart';

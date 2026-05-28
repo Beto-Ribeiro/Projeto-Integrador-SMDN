@@ -1,3 +1,4 @@
+import 'package:branch1/telas/Relatos.dart';
 import 'package:flutter/material.dart';
 import 'exportador_import.dart'; // Importa a tela do mapa
 
@@ -11,14 +12,23 @@ class TelaPrincipal extends StatefulWidget {
 
 class _TelaPrincipalState extends State<TelaPrincipal> {
   // Inicia no índice 1 para abrir o Mapa logo de cara
+  bool estalogado = false;
+
   int _currentIndex = 0;
 
+  void changePage(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
   // Definição das 4 páginas correspondentes aos ícones
-  final List<Widget> _telas = [
-    const Home(title: "SOS"),
-    const Maps_alertas(), // O MAPA É A SEGUNDA PÁGINA (Índice 1)
-    const Scaffold(body: Center(child: Text('Página: Alertas', style: TextStyle(fontSize: 24)))),
-    const Scaffold(body: Center(child: Text('Página: Clima', style: TextStyle(fontSize: 24)))),
+  late final List<Widget> _telas = [
+     Home(title: "SOS", onChangePage: changePage),
+     Maps_alertas(title:"SOS", onChangePage: changePage,), // O MAPA É A SEGUNDA PÁGINA (Índice 1)
+     Relatos_tela(title: "Relato", onChangePage: changePage),
+     Scaffold(body: Center(child: Text('Página: Clima', style: TextStyle(fontSize: 24)))),
+     Cadastro_tela(title: "Cadastro", onChangePage: changePage),
   ];
 
   // Os ícones na exata ordem do design
@@ -34,7 +44,9 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     return Scaffold(
       extendBody: true, // Garante que o mapa passe por trás da barra transparente
       body: _telas[_currentIndex],
-      bottomNavigationBar: CustomAnimatedBottomBar(
+      bottomNavigationBar: _currentIndex == 4
+          ? null
+          :CustomAnimatedBottomBar(
         currentIndex: _currentIndex,
         icones: _icones,
         onTap: (index) {

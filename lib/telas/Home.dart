@@ -1,13 +1,13 @@
 import 'package:branch1/telas/cadastro_tela.dart';
-import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'exportador_import.dart';
 
 class Home extends StatefulWidget {
+  final Function(int) onChangePage;
   const Home({
     super.key,
     required this.title,
+    required this.onChangePage,
   });
 
   final String title;
@@ -179,43 +179,7 @@ class _Home_State extends State<Home> {
                 ],
               ),
             ),
-            Container(
-              child: SizedBox(
-                width: double.infinity,
-                height: 100,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    Material(
-                      color: Colors.transparent,
-                      shape: CircleBorder(),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(33),
-                        onTap: () {},
-
-                        child: Container(
-                          width: 65,
-                          height: 65,
-
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-
-                          child: SvgPicture.asset(
-                            'gfx/svg/icons/User_Icon.svg',
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            ContainerPerfilSuperior(onChangePage: widget.onChangePage,),
           ],
         ),
       ),

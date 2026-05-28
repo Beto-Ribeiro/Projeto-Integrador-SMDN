@@ -4,9 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'exportador_import.dart';
 
 class Maps_alertas extends StatefulWidget {
-  const Maps_alertas({super.key});
+  final Function(int) onChangePage;
+  const Maps_alertas({
+    super.key,
+    required this.title,
+    required this.onChangePage,
+  });
+
+  final String title;
 
   @override
   State<Maps_alertas> createState() => _MapsAlertas();
@@ -84,6 +92,7 @@ class _MapsAlertas extends State<Maps_alertas> {
             ), // Ícone branco
           ),
         ),
+        ContainerPerfilSuperior(onChangePage: widget.onChangePage,),
       ],
     );
   }
