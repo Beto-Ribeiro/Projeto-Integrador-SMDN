@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Menu from "./components/Menu.jsx";
 import Dashboard from "./pages/dashboard.jsx";
-import Reportar from "./pages/Reportar.jsx"; // Dry e Ale
+import Reportar from "./pages/reportar.jsx"; // Dry e Ale
 import "./App.css";
 
 function App() {
