@@ -1,7 +1,16 @@
 # ─── Node / React ──────────────────────────────
 node_modules/
 dist/
+dist-ssr/
 build/
+*.local
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 .env
 .env.local
 .env.production
@@ -17,16 +26,63 @@ mobile/.packages
 *.g.dart
 *.freezed.dart
 
+# ─── Android ───────────────────────────────────
+mobile/android/gradle-wrapper.jar
+mobile/android/.gradle/
+mobile/android/captures/
+mobile/android/gradlew
+mobile/android/gradlew.bat
+mobile/android/local.properties
+mobile/android/GeneratedPluginRegistrant.java
+mobile/android/.cxx/
+mobile/android/key.properties
+mobile/android/**/*.keystore
+mobile/android/**/*.jks
+
+# ─── iOS / Xcode ───────────────────────────────
+**/*.mode1v3
+**/*.mode2v3
+**/*.moved-aside
+**/*.pbxuser
+**/*.perspectivev3
+**/*sync/
+.sconsign.dblite
+.tags*
+**/.vagrant/
+**/DerivedData/
+**/Pods/
+**/.symlinks/
+xcuserdata/
+**/.generated/
+mobile/ios/Flutter/App.framework
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/ephemeral/
+mobile/ios/Flutter/app.flx
+mobile/ios/Flutter/app.zip
+mobile/ios/Flutter/flutter_assets/
+mobile/ios/Flutter/flutter_export_environment.sh
+mobile/ios/ServiceDefinitions.json
+mobile/ios/Runner/GeneratedPluginRegistrant.*
+
 # ─── IDEs ──────────────────────────────────────
 .idea/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 *.iml
 *.ipr
 *.iws
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # ─── Sistema operacional ───────────────────────
 .DS_Store
 Thumbs.db
+Icon?
 
 # ─── Segredos ──────────────────────────────────
 *.pem
