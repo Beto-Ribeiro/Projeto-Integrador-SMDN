@@ -1,0 +1,35 @@
+# ─── Node / React ──────────────────────────────
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.production
+.env.development
+.vercel/
+
+# ─── Flutter / Dart ────────────────────────────
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.packages
+*.g.dart
+*.freezed.dart
+
+# ─── IDEs ──────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# ─── Sistema operacional ───────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Segredos ──────────────────────────────────
+*.pem
+*.key
+google-services.json
+GoogleService-Info.plist

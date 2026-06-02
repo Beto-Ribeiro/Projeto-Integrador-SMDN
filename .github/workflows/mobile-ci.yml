@@ -1,0 +1,48 @@
+name: Mobile CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "mobile/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "mobile/**"
+
+jobs:
+  build:
+    name: Flutter Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: "stable"
+          cache: true
+
+      - name: Instalar dependências
+        run: flutter pub get
+        working-directory: ./mobile
+
+      - name: Verificar formatação
+        run: dart format --output=none --set-exit-if-changed .
+        working-directory: ./mobile
+
+      - name: Análise estática
+        run: flutter analyze
+        working-directory: ./mobile
+
+      - name: Testes
+        run: flutter test
+        working-directory: ./mobile
+
+      - name: Build APK (release)
+        run: flutter build apk --release
+        working-directory: ./mobile
