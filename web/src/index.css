@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #e4e8eb;
+  --bg-sidebar: #09162e;
+  --bg-surface: #ffffff;
+  --text-main: #44769b;
+  --text-on-dark: #a6c1d4;
+  --action-inactive: #18395c;
+  --status-critical: #c60202;
+  --status-severe: #ff6a00;
+  --status-regular: #cab900;
+  --status-success: #02c602;
+  --border-soft: #d0dce6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'K2D', system-ui, sans-serif;
+  background-color: var(--bg-main);
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c0cfd8;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94aab8;
+}
+
+/* Sidebar scrollbar hide */
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@layer components {
+  .badge-critical {
+    @apply bg-status-critical-bg text-status-critical border border-status-critical/20 text-xs font-bold px-2.5 py-0.5 rounded-badge;
+  }
+  .badge-severe {
+    @apply bg-status-severe-bg text-status-severe border border-status-severe/20 text-xs font-bold px-2.5 py-0.5 rounded-badge;
+  }
+  .badge-regular {
+    @apply bg-status-regular-bg text-status-regular border border-status-regular/20 text-xs font-bold px-2.5 py-0.5 rounded-badge;
+  }
+  .badge-success {
+    @apply bg-status-success-bg text-status-success border border-status-success/20 text-xs font-bold px-2.5 py-0.5 rounded-badge;
+  }
+  .btn-primary {
+    @apply bg-text-main text-white font-semibold px-5 py-2.5 rounded-lg hover:bg-action-hover active:scale-95 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-text-main/40;
+  }
+  .btn-ghost {
+    @apply text-text-main font-semibold px-4 py-2 rounded-lg hover:bg-text-main/10 active:scale-95 transition-all duration-150;
+  }
+  .input-field {
+    @apply w-full px-4 py-2.5 border border-border-soft rounded-lg text-sm bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-text-main/30 focus:border-text-main transition-colors;
+  }
+  .select-field {
+    @apply w-full px-4 py-2.5 border border-border-soft rounded-lg text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-text-main/30 focus:border-text-main transition-colors cursor-pointer;
+  }
+}
