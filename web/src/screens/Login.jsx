@@ -24,13 +24,13 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
   return (
     <div className="relative flex h-screen w-full overflow-hidden">
 
-      {/* Fundo: mapa */}
+      {/* Fundo: imagem com blur */}
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/src/assets/map-bg.png')", filter: 'brightness(0.85)' }}
+        style={{ backgroundImage: "url('/src/assets/map-bg.png')", filter: 'blur(px) brightness(0.7)' }}
       />
-      {/* Overlay suave */}
-      <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
+      {/* Overlay escuro suave para dar destaque ao card */}
+      <div className="absolute inset-0 bg-bg-sidebar/30" />
 
       {/* Card dividido — ocupa a tela toda, centralizado */}
       <div className="relative z-10 flex w-full h-full items-center justify-center">
