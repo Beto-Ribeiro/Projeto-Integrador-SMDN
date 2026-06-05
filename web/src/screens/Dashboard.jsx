@@ -1,13 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
 import MapView from '../components/MapView'
-import { useState, useRef } from 'react'
 import Alert_triangle from '../assets/menu/inativo/alert-triangle.svg'
 import Flag from '../assets/menu/inativo/flag.svg'
 import Map_pin from '../assets/menu/inativo/map-pin.svg'
 import Check from '../assets/menu/inativo/map-pin.svg'
-
 
 const MOCK_DATA = {
   activeOccurrences: 12,
@@ -28,7 +26,6 @@ const SEVERITY_CONFIG = {
   regular:  { label: 'Moderado',cls: 'badge-regular',  dotColor: '#cab900', ringColor: 'rgba(202,185,0,0.2)' },
 }
 
-// Converte o formato interno para o que o MapView espera
 function toMapOcorrencias(ocorrencias) {
   return ocorrencias.map((o) => ({
     lat: o.lat,
@@ -40,13 +37,19 @@ function toMapOcorrencias(ocorrencias) {
 
 export default function Dashboard() {
   const [selectedOcc, setSelectedOcc] = useState(null)
+  const mapRef = useRef(null)
+
+  function handleOccClick(occ) {
+    mapRef.current?.flyTo(occ.lat, occ.lng, 15)
+    setSelectedOcc(occ)
+  }
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-100 p-4 animate-fade-in">
 
       {/* ── CAMADA 1: MAPA (fundo total) ── */}
       <Card className="absolute inset-4 !p-0 overflow-hidden border border-slate-200 shadow-sm z-0">
-        <MapView ocorrencias={toMapOcorrencias(MOCK_DATA.recentOccurrences)} />
+        <MapView ref={mapRef} ocorrencias={toMapOcorrencias(MOCK_DATA.recentOccurrences)} />
       </Card>
 
       {/* ── CAMADA 2: COMPONENTES FLUTUANTES ── */}
@@ -62,7 +65,7 @@ export default function Dashboard() {
             return (
               <button
                 key={occ.id}
-                onClick={() => setSelectedOcc(occ)}
+                onClick={() => handleOccClick(occ)}
                 className="w-full flex items-start gap-2.5 px-4 py-3 hover:bg-slate-50/80 transition-colors text-left"
               >
                 <span
