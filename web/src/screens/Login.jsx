@@ -134,12 +134,11 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
 
             {/* Link troca de view */}
             <p className="text-sm text-gray-500 text-center">
-              {isRegister ? 'Já possui conta? ' : 'Não possui conta? '}
               <span
                 onClick={() => setView(isRegister ? 'login' : 'cadastro')}
                 className="text-bg-sidebar font-semibold cursor-pointer hover:underline"
               >
-                {isRegister ? 'Fazer login' : 'Cadastre-se'}
+                {isRegister ? 'Já tenho acesso SMDN' : 'Solicitar acesso ao SMDN'}
               </span>
             </p>
 
