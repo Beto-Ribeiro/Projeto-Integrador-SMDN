@@ -2,10 +2,12 @@ import { useState } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
 import MapView from '../components/MapView'
+import { useState, useRef } from 'react'
 import Alert_triangle from '../assets/menu/inativo/alert-triangle.svg'
 import Flag from '../assets/menu/inativo/flag.svg'
 import Map_pin from '../assets/menu/inativo/map-pin.svg'
 import Check from '../assets/menu/inativo/map-pin.svg'
+
 
 const MOCK_DATA = {
   activeOccurrences: 12,
