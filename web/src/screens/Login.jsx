@@ -27,14 +27,14 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
       {/* Fundo: imagem com blur */}
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/src/assets/map-bg.png')", filter: 'blur(1.5px) brightness(0.7)' }}
+        style={{ backgroundImage: "url('/src/assets/map-bg.png')", filter: 'blur(px) brightness(0.7)' }}
       />
       {/* Overlay escuro suave para dar destaque ao card */}
       <div className="absolute inset-0 bg-bg-sidebar/30" />
 
       {/* Card dividido — ocupa a tela toda, centralizado */}
       <div className="relative z-10 flex w-full h-full items-center justify-center">
-        <div className="flex flex-col md:flex-row w-full max-w-5xl shadow-modal overflow-hidden rounded-2xl" style={{ minHeight: '560px' }}>
+        <div className="flex flex-col md:flex-row w-full max-w-3xl shadow-modal overflow-hidden rounded-2xl" style={{ minHeight: '520px' }}>
 
           {/* Painel esquerdo escuro */}
           <div className="md:w-1/2 bg-bg-sidebar text-text-on-dark flex flex-col justify-center items-center p-8 space-y-8">
