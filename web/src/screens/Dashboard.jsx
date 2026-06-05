@@ -5,7 +5,10 @@ import Alert_triangle from '../assets/menu/inativo/alert-triangle.svg'
 import Flag from '../assets/menu/inativo/flag.svg'
 import Map_pin from '../assets/menu/inativo/map-pin.svg'
 import Check from '../assets/menu/inativo/map-pin.svg'
-import Map_png from '../assets/dashboard/print_maps.png'
+// REMOVIDO:
+// import Map_png from '../assets/dashboard/print_maps.png'
+import MapView from '../components/MapView'
+
 
 const MOCK_DATA = {
   activeOccurrences: 12,
