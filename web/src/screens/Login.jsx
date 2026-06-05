@@ -74,6 +74,11 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
           {/* Painel direito claro — formulário */}
           <div className="md:w-1/2 bg-bg-surface flex flex-col justify-center p-8 space-y-5 flex-1">
 
+            {/* Titulo */}
+            <h2 className="text-2xl font-bold text-slate-800 text-center">
+              {isRegister ? 'Vamos começar?' : 'Bem-vindo de volta!'}
+            </h2>
+
             {/* Cadastro */}
             {isRegister && (
               <>
