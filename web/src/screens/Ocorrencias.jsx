@@ -3,12 +3,12 @@ import Card from '../components/Card'
 import Modal from '../components/Modal'
 
 const ALL_OCORRENCIAS = [
-  { id: 'OC-001', type: 'Enchente', city: 'São José dos Campos', neighborhood: 'Jardim Aquarius', severity: 'critical', status: 'active', reportedAt: '2025-01-10T08:10:00', operator: 'Carlos Mendes', description: 'Rua inundada, famílias precisam de evacuação.' },
-  { id: 'OC-002', type: 'Deslizamento', city: 'Caraguatatuba', neighborhood: 'Pegorelli', severity: 'severe', status: 'active', reportedAt: '2025-01-10T07:35:00', operator: 'Ana Souza', description: 'Talude instável após 80mm de chuva.' },
-  { id: 'OC-004', type: 'Incêndio', city: 'Jacareí', neighborhood: 'Vila Industrial', severity: 'severe', status: 'active', reportedAt: '2025-01-09T22:00:00', operator: 'Carlos Mendes', description: 'Incêndio em vegetação, vento forte dispersando chamas.' },
-  { id: 'OC-005', type: 'Temporal', city: 'Guaratinguetá', neighborhood: 'Santa Luzia', severity: 'regular', status: 'monitoring', reportedAt: '2025-01-09T20:45:00', operator: 'Ana Souza', description: 'Acumulado de chuva dentro do previsto, vias transitáveis.' },
-  { id: 'OC-006', type: 'Desabamento', city: 'Pindamonhangaba', neighborhood: 'Residencial Sul', severity: 'critical', status: 'resolved', reportedAt: '2025-01-09T18:00:00', operator: 'Roberto Lima', description: 'Muro residencial desabou, sem vítimas.' },
-  { id: 'OC-007', type: 'Enchente', city: 'Taubaté', neighborhood: 'Bom Retiro', severity: 'severe', status: 'monitoring', reportedAt: '2025-01-09T15:30:00', operator: 'Carlos Mendes', description: 'Nível do córrego em elevação, monitorando.' },
+  { id: 'OC-001', type: 'Enchente', city: 'São José dos Campos', neighborhood: 'Jardim Aquarius', severity: 'critical', status: 'active', reportedAt: '2025-01-10T08:10:00', description: 'Rua inundada, famílias precisam de evacuação.' },
+  { id: 'OC-002', type: 'Deslizamento', city: 'Caraguatatuba', neighborhood: 'Pegorelli', severity: 'severe', status: 'active', reportedAt: '2025-01-10T07:35:00', description: 'Talude instável após 80mm de chuva.' },
+  { id: 'OC-004', type: 'Incêndio', city: 'Jacareí', neighborhood: 'Vila Industrial', severity: 'severe', status: 'active', reportedAt: '2025-01-09T22:00:00', description: 'Incêndio em vegetação, vento forte dispersando chamas.' },
+  { id: 'OC-005', type: 'Temporal', city: 'Guaratinguetá', neighborhood: 'Santa Luzia', severity: 'regular', status: 'monitoring', reportedAt: '2025-01-09T20:45:00', description: 'Acumulado de chuva dentro do previsto, vias transitáveis.' },
+  { id: 'OC-006', type: 'Desabamento', city: 'Pindamonhangaba', neighborhood: 'Residencial Sul', severity: 'critical', status: 'resolved', reportedAt: '2025-01-09T18:00:00', description: 'Muro residencial desabou, sem vítimas.' },
+  { id: 'OC-007', type: 'Enchente', city: 'Taubaté', neighborhood: 'Bom Retiro', severity: 'severe', status: 'monitoring', reportedAt: '2025-01-09T15:30:00', description: 'Nível do córrego em elevação, monitorando.' },
 ]
 
 const SEVERITY_MAP = {
@@ -128,7 +128,7 @@ export default function Ocorrencias() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border-soft bg-slate-50">
-                {['ID', 'Tipo', 'Município / Bairro', 'Severidade', 'Status', 'Data', 'Operador', ''].map((h) => (
+                {['ID', 'Tipo', 'Município / Bairro', 'Severidade', 'Status', 'Data', ''].map((h) => (
                   <th key={h} className="px-5 py-3 text-left text-label text-slate-500 font-bold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -155,7 +155,6 @@ export default function Ocorrencias() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(o.reportedAt)}</td>
-                    <td className="px-5 py-3 text-slate-600 text-xs">{o.operator}</td>
                     <td className="px-5 py-3">
                       <button
                         onClick={() => setSelected(o)}
@@ -188,7 +187,6 @@ export default function Ocorrencias() {
               <div><dt className="text-label text-slate-400">MUNICÍPIO</dt><dd className="text-slate-700 font-medium mt-0.5">{selected.city}</dd></div>
               <div><dt className="text-label text-slate-400">BAIRRO</dt><dd className="text-slate-700 font-medium mt-0.5">{selected.neighborhood}</dd></div>
               <div><dt className="text-label text-slate-400">DATA DE REGISTRO</dt><dd className="text-slate-700 font-medium mt-0.5">{formatDate(selected.reportedAt)}</dd></div>
-              <div><dt className="text-label text-slate-400">OPERADOR</dt><dd className="text-slate-700 font-medium mt-0.5">{selected.operator}</dd></div>
             </dl>
             <div>
               <p className="text-label text-slate-400 mb-1">DESCRIÇÃO</p>
