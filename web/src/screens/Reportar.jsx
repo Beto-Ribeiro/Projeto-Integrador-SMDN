@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
+import MapView from '../components/MapView'
 
 const ALERT_TYPES = ['Enchente', 'Deslizamento', 'Temporal', 'Tornado']
 const CITIES = ['São José dos Campos', 'Taubaté', 'Caraguatatuba', 'Jacareí', 'Pindamonhangaba', 'Guaratinguetá']
@@ -65,6 +66,8 @@ export default function Reportar() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form, setForm] = useState({ type: '', city: '', severity: 'critical', description: '', neighborhood: '' })
   const [successMsg, setSuccessMsg] = useState(false)
+  const [isMapOpen, setIsMapOpen] = useState(false) 
+  const [autoFilled, setAutoFilled] = useState(false)
 
   const handleDispatch = () => {
     // TODO: Supabase insert + send push notifications
@@ -72,6 +75,40 @@ export default function Reportar() {
     setSuccessMsg(true)
     setForm({ type: '', city: '', severity: 'critical', description: '', neighborhood: '' })
     setTimeout(() => setSuccessMsg(false), 4000)
+  }
+
+  const handleMapClick = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      )
+
+      const data = await response.json()
+
+      const city =
+        data.address?.city ||
+        data.address?.town ||
+        data.address?.municipality ||
+        data.address?.village ||
+        ''
+
+      const neighborhood =
+        data.address?.suburb ||
+        data.address?.neighbourhood ||
+        data.address?.quarter ||
+        ''
+
+      setForm((prev) => ({
+        ...prev,
+        city,
+        neighborhood,
+      }))
+
+      setAutoFilled(true)
+      setIsMapOpen(false)
+    } catch (error) {
+      console.error('Erro ao localizar endereço:', error)
+    }
   }
 
   return (
@@ -175,15 +212,26 @@ export default function Reportar() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-label text-slate-600 mb-1.5">MUNICÍPIO</label>
-              <select
-                className="select-field"
+              <label className="block text-label text-slate-600 mb-1.5">
+                MUNICÍPIO
+              </label>
+
+              <input
+                className={`input-field ${
+                  autoFilled
+                    ? 'border border-[#597891] ring-1 ring-[#597891]/20'
+                    : ''
+                }`}
+                placeholder="Município será preenchido pelo mapa"
                 value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-              >
-                <option value="">Selecione...</option>
-                {CITIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
+                onChange={(e) => {
+                  setAutoFilled(false)
+                  setForm((f) => ({
+                    ...f,
+                    city: e.target.value,
+                  }))
+                }}
+              />
             </div>
             <div>
               <label className="block text-label text-slate-600 mb-1.5">SEVERIDADE</label>
@@ -201,12 +249,41 @@ export default function Reportar() {
           <div>
             <label className="block text-label text-slate-600 mb-1.5">BAIRRO / ÁREA (opcional)</label>
             <input
-              className="input-field"
+              className={`input-field ${
+                autoFilled
+                  ? 'border border-[#597891] ring-1 ring-[#597891]/20'
+                  : ''
+              }`}
               placeholder="Ex: Centro, Vila Nova..."
               value={form.neighborhood}
-              onChange={(e) => setForm((f) => ({ ...f, neighborhood: e.target.value }))}
+              onChange={(e) => {
+                setAutoFilled(false)
+                setForm((f) => ({
+                  ...f,
+                  neighborhood: e.target.value,
+                }))
+              }}
             />
           </div>
+
+          <button
+            className="w-full py-3 bg-[#597891] hover:bg-[#2D5A87] text-white font-semibold rounded-lg transition-colors"
+            onClick={() => setIsMapOpen(true)}
+          >
+            Localizar Área no Mapa
+          </button>
+
+          <Modal
+            isOpen={isMapOpen}
+            onClose={() => setIsMapOpen(false)}
+            title="Localizar Área"
+            size="xl"
+          >
+            <div className="h-[500px] rounded-lg overflow-hidden">
+              <MapView onMapClick={handleMapClick} />
+            </div>
+          </Modal>
+          
           <div>
             <label className="block text-label text-slate-600 mb-1.5">MENSAGEM DO ALERTA</label>
             <textarea
@@ -217,18 +294,6 @@ export default function Reportar() {
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             />
           </div>
-
-          {/* Preview */}
-          {(form.type || form.city) && (
-            <div className="bg-slate-50 border border-border-soft rounded-lg p-3 text-sm text-slate-600 space-y-1">
-              <p className="text-label text-slate-400">PRÉ-VISUALIZAÇÃO</p>
-              <p>
-                <strong>⚠️ {form.type || '—'}</strong>{form.city ? ` em ${form.city}` : ''}
-                {form.severity === 'critical' ? ' – CRÍTICO' : form.severity === 'severe' ? ' – GRAVE' : ''}
-              </p>
-              {form.description && <p className="text-slate-500">{form.description}</p>}
-            </div>
-          )}
 
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-border-soft">
             <button className="btn-ghost" onClick={() => setIsModalOpen(false)}>Cancelar</button>

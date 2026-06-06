@@ -9,7 +9,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-const MapView = forwardRef(function MapView({ ocorrencias = [] }, ref) {
+const MapView = forwardRef(function MapView(
+  { ocorrencias = [], onMapClick },
+  ref
+) {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
 
@@ -26,6 +29,14 @@ const MapView = forwardRef(function MapView({ ocorrencias = [] }, ref) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstanceRef.current)
+
+    mapInstanceRef.current.on('click', (e) => {
+      const { lat, lng } = e.latlng
+
+      if (onMapClick) {
+        onMapClick(lat, lng)
+      }
+    })
 
     ocorrencias.forEach(({ lat, lng, titulo, severidade }) => {
       const cor = severidade === 'Crítico' ? '#c60202' : severidade === 'Grave' ? '#ff6a00' : '#cab900'
