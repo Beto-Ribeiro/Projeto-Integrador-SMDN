@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Card from '../components/Card'
+import externalIcon from '../assets/relatorios/external-link.svg'
 
 const MONTHLY = [
   { month: 'Jul', total: 38, critical: 8 },
@@ -98,6 +99,24 @@ export default function Relatorios() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Export buttons */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
+        >
+          <img src={externalIcon} width="13" height="13" alt="external-link" />
+          Exportar PDF
+        </button>
+        <button
+          onClick={() => alert('Exportar Excel')}
+          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
+        >
+          <img src={externalIcon} width="13" height="13" alt="external-link" />
+          Exportar Excel
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
