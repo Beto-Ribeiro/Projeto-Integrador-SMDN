@@ -1,46 +1,61 @@
 import { useAuth } from '../hooks/useAuth.js'
 import dashboardIcon from '../assets/menu/ativo/map-pin.svg';
+import dashboardIconWHITE from '../assets/menu/hover/map-pin.svg';
 import reportIcon from '../assets/menu/ativo/flag.svg';
+import reportIconWHITE from '../assets/menu/hover/flag.svg';
 import ocorrenciasIcon from '../assets/menu/ativo/alert-triangle.svg';
+import ocorrenciasIconWHITE from '../assets/menu/hover/alert-triangle.svg';
 import relatoriosIcon from '../assets/menu/ativo/pie-chart.svg';
+import relatoriosIconWHITE from '../assets/menu/hover/pie-chart.svg';
 import auditoriaIcon from '../assets/menu/ativo/lock.svg';
+import auditoriaIconWHITE from '../assets/menu/hover/lock.svg';
 import perfilIcon from '../assets/menu/ativo/user.svg';
+import perfilIconWHITE from '../assets/menu/hover/user.svg';
 import logoutIcon from '../assets/menu/ativo/log-out.svg';
+import logoutIconWHITE from '../assets/menu/hover/log-out.svg';
 
 const NAV_ITEMS = [
   { id: 'dashboard',
     label: 'Dashboard',
     icon: <img src={dashboardIcon} width="20" height="20" alt="map-pin" />,
+    iconWhite: <img src={dashboardIconWHITE} width="20" height="20" alt="map-pin" />
   },
   {
     id: 'reportar',
     label: 'Reportar',
     icon: <img src={reportIcon} width="20" height="20" alt="flag" />,
+    iconWhite: <img src={reportIconWHITE} width="20" height="20" alt="flag" />
   },
   {
     id: 'ocorrencias',
     label: 'Ocorrências',
     icon: <img src={ocorrenciasIcon} width="20" height="20" alt="alert-triangle" />,
+    iconWhite: <img src={ocorrenciasIconWHITE} width="20" height="20" alt="alert-triangle" />
   },
   {
     id: 'relatorios',
     label: 'Relatórios',
     icon: <img src={relatoriosIcon} width="20" height="20" alt="pie-chart" />,
+    iconWhite: <img src={relatoriosIconWHITE} width="20" height="20" alt="pie-chart" />
   },
   {
     id: 'auditoria',
     label: 'Auditoria',
     icon: <img src={auditoriaIcon} width="20" height="20" alt="lock" />,
+    iconWhite: <img src={auditoriaIconWHITE} width="20" height="20" alt="lock" />
   },
   {
     id: 'perfil',
     label: 'Perfil',
     icon: <img src={perfilIcon} width="20" height="20" alt="user" />,
+    iconWhite: <img src={perfilIconWHITE} width="20" height="20" alt="user" />
   },
 ]
 
 export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
   const { user } = useAuth()
+
+  const [hoveredItem, setHoveredItem] = useState(null)
 
   return (
     <aside
@@ -60,15 +75,17 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
             <button
               key={item.id}
               onClick={() => setCurrentScreen(item.id)}
+              onMouseEnter={() => setHoveredItem(item.id)}
+              onMouseLeave={() => setHoveredItem(null)}
               className={`
-                group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150
+                 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150
                 ${active
                   ? 'bg-text-main text-white shadow-sm'
                   : 'text-text-on-dark hover:bg-white/5 hover:text-white'
                 }
               `}
             >
-              <span className={`transition-opacity duration-150 ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>{item.icon}</span>
+              <span>{active || hoveredItem === item.id ? item.iconWhite : item.icon}</span>
               <span className="truncate">{item.label}</span>
             </button>
           )
@@ -92,9 +109,11 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
         )}
         <button
           onClick={onLogout}
+          onMouseEnter={() => setHoveredItem('logout')}
+          onMouseLeave={() => setHoveredItem(null)}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all"
         >
-          <img src={logoutIcon} width="20" height="20" alt="log-out" />
+          <img src={hoveredItem === 'logout' ? logoutIconWHITE : logoutIcon} width="20" height="20" alt="log-out" />
           <span>Sair</span>
         </button>
       </div>
