@@ -11,12 +11,13 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [email, setEmail] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
 
   const handleSubmit = () => {
     if (isRegister) {
       onRegister({ institution, name, email, role })
     } else {
-      onLogin({ email })
+      onLogin({ email, rememberMe })
     }
   }
 
@@ -120,6 +121,22 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
               />
+            )}
+
+            {/* Lembrar-me — só no login */}
+            {!isRegister && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 text-bg-sidebar focus:ring-bg-sidebar border-gray-300 rounded"
+                />
+                <label htmlFor="rememberMe" className="text-sm text-gray-500">
+                  Mantenha-me logado.
+                </label>
+              </div>
             )}
 
             {/* Link troca de view */}
