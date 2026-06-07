@@ -63,10 +63,14 @@ function formatDate(iso) {
 
 export default function Reportar() {
   const [alerts] = useState(MOCK_ALERTS)
+  const [filterSeverity, setFilterSeverity] = useState('')
+  const [filterCity, setFilterCity] = useState('')
+  const [filterDate, setFilterDate] = useState('')
+  const [filterOperator, setFilterOperator] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form, setForm] = useState({ type: '', city: '', severity: 'critical', description: '', neighborhood: '' })
   const [successMsg, setSuccessMsg] = useState(false)
-  const [isMapOpen, setIsMapOpen] = useState(false) 
+  const [isMapOpen, setIsMapOpen] = useState(false)
   const [autoFilled, setAutoFilled] = useState(false)
 
   const handleDispatch = () => {
@@ -111,6 +115,30 @@ export default function Reportar() {
     }
   }
 
+  const filteredAlerts = alerts.filter((alert) => {
+    const matchesSeverity =
+      !filterSeverity || alert.severity === filterSeverity
+
+    const matchesCity =
+      !filterCity ||
+      alert.city.toLowerCase().includes(filterCity.toLowerCase())
+
+    const matchesOperator =
+      !filterOperator ||
+      alert.operator.toLowerCase().includes(filterOperator.toLowerCase())
+
+    const matchesDate =
+      !filterDate ||
+      alert.sentAt.slice(0, 10) === filterDate
+
+    return (
+      matchesSeverity &&
+      matchesCity &&
+      matchesOperator &&
+      matchesDate
+    )
+  })
+
   return (
     <div className="p-8 space-y-6 animate-fade-in">
       {/* Header + Stats row */}
@@ -118,7 +146,37 @@ export default function Reportar() {
         {/* Title */}
         <div className="shrink-0">
         </div>
+        <div className="px-6 py-4 border-b border-border-soft">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
 
+            <select
+              className="select-field"
+              value={filterSeverity}
+              onChange={(e) => setFilterSeverity(e.target.value)}
+            >
+              <option value="">Todas Severidades</option>
+              <option value="critical">Crítico</option>
+              <option value="severe">Grave</option>
+              <option value="regular">Moderado</option>
+            </select>
+
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Pesquisar cidade..."
+              value={filterCity}
+              onChange={(e) => setFilterCity(e.target.value)}
+            />
+
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Pesquisar operador..."
+              value={filterOperator}
+              onChange={(e) => setFilterOperator(e.target.value)}
+            />
+          </div>
+        </div>
         {/* Stats inline */}
         <div className="flex items-center gap-4 flex-1 justify-end">
           <Card className="text-center py-3 px-5">
@@ -142,7 +200,7 @@ export default function Reportar() {
               />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="text-xs font-bold leading-tight text-center">Disparar<br/>Alerta</span>
+            <span className="text-xs font-bold leading-tight text-center">Disparar<br />Alerta</span>
           </button>
         </div>
       </div>
@@ -162,10 +220,10 @@ export default function Reportar() {
       <Card className="p-0 overflow-hidden">
         <div className="px-6 py-4 border-b border-border-soft flex items-center justify-between">
           <h3 className="text-card-title font-bold text-slate-800">Histórico de Alertas</h3>
-          <span className="text-xs text-slate-400">{alerts.length} registros</span>
         </div>
+
         <div className="divide-y divide-border-soft">
-          {alerts.map((alert) => (
+          {filteredAlerts.map((alert) => (
             <div key={alert.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -177,17 +235,17 @@ export default function Reportar() {
                   <p className="text-sm text-slate-600 mb-2">{alert.description}</p>
                   <div className="flex items-center gap-4 text-xs text-slate-400">
                     <span className="flex items-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5 1.5V4M11 1.5V4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 7h12" stroke="currentColor" strokeWidth="1.4"/></svg>
-                    {formatDate(alert.sentAt)}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M5 1.5V4M11 1.5V4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M2 7h12" stroke="currentColor" strokeWidth="1.4" /></svg>
+                      {formatDate(alert.sentAt)}
                     </span>
                     <span className="flex items-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 13.5c0-2.485 2.686-4.5 6-4.5s6 2.015 6 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                    {alert.operator}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4" /><path d="M2 13.5c0-2.485 2.686-4.5 6-4.5s6 2.015 6 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                      {alert.operator}
                     </span>
                     <span className="flex items-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="4" y="1" width="8" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M7 12.5h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                    {alert.recipients.toLocaleString('pt-BR')} destinatários
-                </span>
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="4" y="1" width="8" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M7 12.5h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                      {alert.recipients.toLocaleString('pt-BR')} destinatários
+                    </span>
                   </div>
                 </div>
               </div>
@@ -217,11 +275,10 @@ export default function Reportar() {
               </label>
 
               <input
-                className={`input-field ${
-                  autoFilled
-                    ? 'border border-[#597891] ring-1 ring-[#597891]/20'
-                    : ''
-                }`}
+                className={`input-field ${autoFilled
+                  ? 'border border-[#597891] ring-1 ring-[#597891]/20'
+                  : ''
+                  }`}
                 placeholder="Município será preenchido pelo mapa"
                 value={form.city}
                 onChange={(e) => {
@@ -249,11 +306,10 @@ export default function Reportar() {
           <div>
             <label className="block text-label text-slate-600 mb-1.5">BAIRRO / ÁREA (opcional)</label>
             <input
-              className={`input-field ${
-                autoFilled
-                  ? 'border border-[#597891] ring-1 ring-[#597891]/20'
-                  : ''
-              }`}
+              className={`input-field ${autoFilled
+                ? 'border border-[#597891] ring-1 ring-[#597891]/20'
+                : ''
+                }`}
               placeholder="Ex: Centro, Vila Nova..."
               value={form.neighborhood}
               onChange={(e) => {
@@ -283,7 +339,7 @@ export default function Reportar() {
               <MapView onMapClick={handleMapClick} />
             </div>
           </Modal>
-          
+
           <div>
             <label className="block text-label text-slate-600 mb-1.5">MENSAGEM DO ALERTA</label>
             <textarea
