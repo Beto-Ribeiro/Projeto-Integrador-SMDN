@@ -1,11 +1,11 @@
 import { useAuth } from '../hooks/useAuth.js'
-import dashboardIcon from '../assets/menu/inativo/map-pin.svg';
-import reportIcon from '../assets/menu/inativo/flag.svg';
-import ocorrenciasIcon from '../assets/menu/inativo/alert-triangle.svg';
-import relatoriosIcon from '../assets/menu/inativo/pie-chart.svg';
-import auditoriaIcon from '../assets/menu/inativo/lock.svg';
-import perfilIcon from '../assets/menu/inativo/user.svg';
-import logoutIcon from '../assets/menu/inativo/log-out.svg';
+import dashboardIcon from '../assets/menu/ativo/map-pin.svg';
+import reportIcon from '../assets/menu/ativo/flag.svg';
+import ocorrenciasIcon from '../assets/menu/ativo/alert-triangle.svg';
+import relatoriosIcon from '../assets/menu/ativo/pie-chart.svg';
+import auditoriaIcon from '../assets/menu/ativo/lock.svg';
+import perfilIcon from '../assets/menu/ativo/user.svg';
+import logoutIcon from '../assets/menu/ativo/log-out.svg';
 
 const NAV_ITEMS = [
   { id: 'dashboard',
