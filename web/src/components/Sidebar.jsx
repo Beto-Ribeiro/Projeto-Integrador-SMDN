@@ -54,7 +54,6 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
   const { user } = useAuth()
-
   const [hoveredItem, setHoveredItem] = useState(null)
 
   return (
