@@ -61,14 +61,14 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               key={item.id}
               onClick={() => setCurrentScreen(item.id)}
               className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150
+                group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150
                 ${active
                   ? 'bg-text-main text-white shadow-sm'
                   : 'text-text-on-dark hover:bg-white/5 hover:text-white'
                 }
               `}
             >
-              <span className={active ? 'text-white' : 'text-text-on-dark opacity-70'}>{item.icon}</span>
+              <span className={`transition-opacity duration-150 ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>{item.icon}</span>
               <span className="truncate">{item.label}</span>
             </button>
           )
