@@ -1,4 +1,5 @@
 import { useAuth } from '../hooks/useAuth.js'
+import { useState } from 'react'
 import dashboardIcon from '../assets/menu/ativo/map-pin.svg';
 import dashboardIconWHITE from '../assets/menu/hover/map-pin.svg';
 import reportIcon from '../assets/menu/ativo/flag.svg';
