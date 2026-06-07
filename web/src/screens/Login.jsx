@@ -11,13 +11,12 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
 
   const handleSubmit = () => {
     if (isRegister) {
       onRegister({ institution, name, email, role })
     } else {
-      onLogin({ email, password })
+      onLogin({ email })
     }
   }
 
@@ -122,15 +121,6 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
               />
             )}
-
-            {/* Senha */}
-            <input
-              type="password"
-              placeholder="Digite sua senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
-            />
 
             {/* Link troca de view */}
             <p className="text-sm text-gray-500 text-center">
