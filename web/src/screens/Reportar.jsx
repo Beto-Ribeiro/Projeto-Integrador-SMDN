@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
 import MapView from '../components/MapView'
 
 const ALERT_TYPES = ['Enchente', 'Deslizamento', 'Temporal', 'Tornado']
-const CITIES = ['São José dos Campos', 'Taubaté', 'Caraguatatuba', 'Jacareí', 'Pindamonhangaba', 'Guaratinguetá']
 const SEVERITIES = ['critical', 'severe', 'regular']
 
 const MOCK_ALERTS = [
@@ -52,13 +51,16 @@ const MOCK_ALERTS = [
 
 const SEVERITY_MAP = {
   critical: { label: 'Crítico', cls: 'badge-critical' },
-  severe: { label: 'Grave', cls: 'badge-severe' },
-  regular: { label: 'Moderado', cls: 'badge-regular' },
+  severe:   { label: 'Grave',   cls: 'badge-severe'   },
+  regular:  { label: 'Moderado',cls: 'badge-regular'  },
 }
 
 function formatDate(iso) {
   const d = new Date(iso)
-  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
 }
 
 export default function Reportar() {
@@ -73,6 +75,13 @@ export default function Reportar() {
   const [isMapOpen, setIsMapOpen] = useState(false)
   const [autoFilled, setAutoFilled] = useState(false)
 
+  const mapRef = useRef(null)
+
+  // targetLocation derivado do form — passado ao MapView para geocodificar e dar zoom
+  const targetLocation = (form.city || form.neighborhood)
+    ? { city: form.city, neighborhood: form.neighborhood }
+    : null
+
   const handleDispatch = () => {
     // TODO: Supabase insert + send push notifications
     setIsModalOpen(false)
@@ -86,7 +95,6 @@ export default function Reportar() {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
       )
-
       const data = await response.json()
 
       const city =
@@ -102,12 +110,7 @@ export default function Reportar() {
         data.address?.quarter ||
         ''
 
-      setForm((prev) => ({
-        ...prev,
-        city,
-        neighborhood,
-      }))
-
+      setForm((prev) => ({ ...prev, city, neighborhood }))
       setAutoFilled(true)
       setIsMapOpen(false)
     } catch (error) {
@@ -116,39 +119,22 @@ export default function Reportar() {
   }
 
   const filteredAlerts = alerts.filter((alert) => {
-    const matchesSeverity =
-      !filterSeverity || alert.severity === filterSeverity
-
-    const matchesCity =
-      !filterCity ||
-      alert.city.toLowerCase().includes(filterCity.toLowerCase())
-
-    const matchesOperator =
-      !filterOperator ||
-      alert.operator.toLowerCase().includes(filterOperator.toLowerCase())
-
-    const matchesDate =
-      !filterDate ||
-      alert.sentAt.slice(0, 10) === filterDate
-
-    return (
-      matchesSeverity &&
-      matchesCity &&
-      matchesOperator &&
-      matchesDate
-    )
+    const matchesSeverity = !filterSeverity || alert.severity === filterSeverity
+    const matchesCity     = !filterCity     || alert.city.toLowerCase().includes(filterCity.toLowerCase())
+    const matchesOperator = !filterOperator || alert.operator.toLowerCase().includes(filterOperator.toLowerCase())
+    const matchesDate     = !filterDate     || alert.sentAt.slice(0, 10) === filterDate
+    return matchesSeverity && matchesCity && matchesOperator && matchesDate
   })
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
+
       {/* Header + Stats row */}
       <div className="flex items-center justify-between gap-6">
-        {/* Title */}
-        <div className="shrink-0">
-        </div>
+        <div className="shrink-0" />
+
         <div className="px-6 py-4 border-b border-border-soft">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-
             <select
               className="select-field"
               value={filterSeverity}
@@ -177,6 +163,7 @@ export default function Reportar() {
             />
           </div>
         </div>
+
         {/* Stats inline */}
         <div className="flex items-center gap-4 flex-1 justify-end">
           <Card className="text-center py-3 px-5">
@@ -194,10 +181,7 @@ export default function Reportar() {
             onClick={() => setIsModalOpen(true)}
           >
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
-                stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              />
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span className="text-xs font-bold leading-tight text-center">Disparar<br />Alerta</span>
@@ -268,25 +252,17 @@ export default function Reportar() {
               {ALERT_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-label text-slate-600 mb-1.5">
-                MUNICÍPIO
-              </label>
-
+              <label className="block text-label text-slate-600 mb-1.5">MUNICÍPIO</label>
               <input
-                className={`input-field ${autoFilled
-                  ? 'border border-[#597891] ring-1 ring-[#597891]/20'
-                  : ''
-                  }`}
+                className={`input-field ${autoFilled ? 'border border-[#597891] ring-1 ring-[#597891]/20' : ''}`}
                 placeholder="Município será preenchido pelo mapa"
                 value={form.city}
                 onChange={(e) => {
                   setAutoFilled(false)
-                  setForm((f) => ({
-                    ...f,
-                    city: e.target.value,
-                  }))
+                  setForm((f) => ({ ...f, city: e.target.value }))
                 }}
               />
             </div>
@@ -303,21 +279,16 @@ export default function Reportar() {
               </select>
             </div>
           </div>
+
           <div>
             <label className="block text-label text-slate-600 mb-1.5">BAIRRO / ÁREA (opcional)</label>
             <input
-              className={`input-field ${autoFilled
-                ? 'border border-[#597891] ring-1 ring-[#597891]/20'
-                : ''
-                }`}
+              className={`input-field ${autoFilled ? 'border border-[#597891] ring-1 ring-[#597891]/20' : ''}`}
               placeholder="Ex: Centro, Vila Nova..."
               value={form.neighborhood}
               onChange={(e) => {
                 setAutoFilled(false)
-                setForm((f) => ({
-                  ...f,
-                  neighborhood: e.target.value,
-                }))
+                setForm((f) => ({ ...f, neighborhood: e.target.value }))
               }}
             />
           </div>
@@ -329,6 +300,7 @@ export default function Reportar() {
             Localizar Área no Mapa
           </button>
 
+          {/* Modal do mapa — com ref e targetLocation */}
           <Modal
             isOpen={isMapOpen}
             onClose={() => setIsMapOpen(false)}
@@ -336,7 +308,11 @@ export default function Reportar() {
             size="xl"
           >
             <div className="h-[500px] rounded-lg overflow-hidden">
-              <MapView onMapClick={handleMapClick} />
+              <MapView
+                ref={mapRef}
+                onMapClick={handleMapClick}
+                targetLocation={targetLocation}
+              />
             </div>
           </Modal>
 
