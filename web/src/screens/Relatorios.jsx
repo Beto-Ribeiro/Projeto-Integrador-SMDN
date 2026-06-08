@@ -1,58 +1,265 @@
-import { useState } from 'react'
+/**
+ * Relatorios.jsx
+ *
+ * Exportação PDF  → html2canvas + jsPDF (captura só o div#relatorio-content)
+ * Exportação Excel → SheetJS (xlsx) com múltiplas abas
+ *
+ * ─── Como conectar ao backend ────────────────────────────────────────────────
+ * Todos os dados vivem no objeto `reportData` dentro do hook `useReportData`.
+ * Hoje ele retorna dados estáticos (mock). Quando o banco estiver pronto,
+ * basta substituir o conteúdo do hook por uma chamada à API, ex.:
+ *
+ *   const { data } = useQuery(['report', period], () => api.getReport(period))
+ *   return data ?? FALLBACK_DATA
+ *
+ * O restante do componente — PDF, Excel, gráficos — funciona sem nenhuma
+ * outra alteração, pois tudo já consome `reportData`.
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Dependências necessárias (instalar uma vez):
+ *   npm install html2canvas jspdf xlsx
+ */
+
+import { useState, useRef, useCallback } from 'react'
 import Card from '../components/Card'
 import externalIcon from '../assets/relatorios/external-link.svg'
 
-const MONTHLY = [
-  { month: 'Jul', total: 38, critical: 8 },
-  { month: 'Ago', total: 45, critical: 11 },
-  { month: 'Set', total: 29, critical: 5 },
-  { month: 'Out', total: 52, critical: 14 },
-  { month: 'Nov', total: 61, critical: 18 },
-  { month: 'Dez', total: 47, critical: 12 },
-  { month: 'Jan', total: 55, critical: 16 },
+// ─── Dependências de exportação ──────────────────────────────────────────────
+// Se ainda não instalou: npm install html2canvas jspdf xlsx
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
+import * as XLSX from 'xlsx'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOOK DE DADOS
+// Centraliza todos os dados do relatório num único lugar.
+// Substituir o corpo deste hook pela chamada à API quando o backend estiver pronto.
+// ─────────────────────────────────────────────────────────────────────────────
+function useReportData(period) {
+  // TODO: substituir pelo fetch real quando o BD estiver pronto
+  // Exemplo:
+  //   const [data, setData] = useState(null)
+  //   useEffect(() => { api.getReport(period).then(setData) }, [period])
+  //   if (!data) return { loading: true, data: FALLBACK_DATA }
+
+  const data = {
+    kpis: {
+      total: 327,
+      totalDelta: '+12%',
+      totalPositive: false,
+      resolutionRate: '89%',
+      resolutionDelta: '+5%',
+      resolutionPositive: true,
+    },
+    monthly: [
+      { month: 'Jul', total: 38, critical: 8 },
+      { month: 'Ago', total: 45, critical: 11 },
+      { month: 'Set', total: 29, critical: 5 },
+      { month: 'Out', total: 52, critical: 14 },
+      { month: 'Nov', total: 61, critical: 18 },
+      { month: 'Dez', total: 47, critical: 12 },
+      { month: 'Jan', total: 55, critical: 16 },
+    ],
+    byType: [
+      { type: 'Enchente',     count: 42, pct: 34 },
+      { type: 'Deslizamento', count: 28, pct: 22 },
+      { type: 'Temporal',     count: 21, pct: 17 },
+      { type: 'Tornado',      count: 1,  pct: 10 },
+      { type: 'Desabamento',  count: 4,  pct:  3 },
+    ],
+    byCity: [
+      { city: 'São José dos Campos', count: 51 },
+      { city: 'Taubaté',             count: 28 },
+      { city: 'Caraguatatuba',        count: 22 },
+      { city: 'Jacareí',             count: 17 },
+      { city: 'Pindamonhangaba',     count: 12 },
+      { city: 'Guaratinguetá',       count:  9 },
+    ],
+    bySeverity: [
+      { label: 'Crítico',  count: 58,  pct: 18, color: 'bg-status-critical', text: 'text-status-critical' },
+      { label: 'Grave',    count: 104, pct: 32, color: 'bg-status-severe',   text: 'text-status-severe'   },
+      { label: 'Moderado', count: 112, pct: 34, color: 'bg-status-regular',  text: 'text-status-regular'  },
+      { label: 'Normal',   count: 53,  pct: 16, color: 'bg-status-success',  text: 'text-status-success'  },
+    ],
+    byStatus: [
+      { label: 'Resolvidas',   count: 291, pct: 89, color: '#02c602' },
+      { label: 'Em andamento', count: 24,  pct:  7, color: '#ff6a00' },
+      { label: 'Pendentes',    count: 12,  pct:  4, color: '#c60202' },
+    ],
+  }
+
+  return { loading: false, data }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITÁRIOS DE EXPORTAÇÃO
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Gera e baixa um PDF bonito a partir do elemento DOM passado.
+ * Usa html2canvas para renderizar o conteúdo e jsPDF para empacotar.
+ */
+async function exportToPDF(element, period) {
+  // Esconde temporariamente os botões de exportação dentro da área capturada
+  const exportBar = element.querySelector('[data-export-bar]')
+  if (exportBar) exportBar.style.visibility = 'hidden'
+
+  const canvas = await html2canvas(element, {
+    scale: 2,          // alta resolução
+    useCORS: true,
+    backgroundColor: '#f8fafc',
+    logging: false,
+  })
+
+  if (exportBar) exportBar.style.visibility = ''
+
+  const imgData = canvas.toDataURL('image/png')
+  const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  const pageW  = pdf.internal.pageSize.getWidth()
+  const pageH  = pdf.internal.pageSize.getHeight()
+  const margin = 10
+  const usableW = pageW - margin * 2
+  const imgH    = (canvas.height * usableW) / canvas.width
+
+  // Cabeçalho
+  pdf.setFillColor(15, 23, 42)        // slate-900
+  pdf.rect(0, 0, pageW, 14, 'F')
+  pdf.setTextColor(255, 255, 255)
+  pdf.setFontSize(9)
+  pdf.setFont('helvetica', 'bold')
+  pdf.text('SMDN – Sistema de Monitoramento de Desastres Naturais', margin, 9)
+  pdf.setFont('helvetica', 'normal')
+  pdf.text(`Relatório · ${period} · Gerado em ${new Date().toLocaleDateString('pt-BR')}`, pageW - margin, 9, { align: 'right' })
+
+  // Conteúdo (com paginação automática)
+  const startY = 16
+  let remaining = imgH
+  let srcY = 0
+
+  while (remaining > 0) {
+    const sliceH = Math.min(pageH - startY - margin, remaining)
+    const sliceCanvas = document.createElement('canvas')
+    sliceCanvas.width  = canvas.width
+    sliceCanvas.height = (sliceH / usableW) * canvas.width
+
+    const ctx = sliceCanvas.getContext('2d')
+    ctx.drawImage(canvas, 0, srcY * (canvas.width / usableW), canvas.width, sliceCanvas.height, 0, 0, sliceCanvas.width, sliceCanvas.height)
+
+    pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, startY, usableW, sliceH)
+
+    remaining -= sliceH
+    srcY      += sliceH
+
+    if (remaining > 0) {
+      pdf.addPage()
+    }
+  }
+
+  // Rodapé
+  const totalPages = pdf.internal.getNumberOfPages()
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i)
+    pdf.setFontSize(7)
+    pdf.setTextColor(148, 163, 184) // slate-400
+    pdf.text(`Página ${i} de ${totalPages}`, pageW / 2, pageH - 4, { align: 'center' })
+  }
+
+  pdf.save(`SMDN_Relatorio_${period.replace(/\s+/g, '_')}.pdf`)
+}
+
+/**
+ * Gera e baixa um arquivo Excel (.xlsx) com abas separadas por seção.
+ * Estruturado para receber dados reais sem alteração.
+ */
+function exportToExcel(data, period) {
+  const wb = XLSX.utils.book_new()
+
+  // ── Aba 1: Resumo ──────────────────────────────────────────────────────────
+  const resumoRows = [
+    ['SMDN – Relatório de Ocorrências'],
+    [`Período: ${period}`],
+    [`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`],
+    [],
+    ['Indicador', 'Valor', 'Variação'],
+    ['Total de Ocorrências', data.kpis.total,         data.kpis.totalDelta],
+    ['Taxa de Resolução',    data.kpis.resolutionRate, data.kpis.resolutionDelta],
+  ]
+  const wsResumo = XLSX.utils.aoa_to_sheet(resumoRows)
+  wsResumo['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 14 }]
+  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo')
+
+  // ── Aba 2: Por Mês ─────────────────────────────────────────────────────────
+  const monthlyRows = [
+    ['Mês', 'Total', 'Críticos', '% Críticos'],
+    ...data.monthly.map((m) => [
+      m.month,
+      m.total,
+      m.critical,
+      `${((m.critical / m.total) * 100).toFixed(1)}%`,
+    ]),
+  ]
+  const wsMensal = XLSX.utils.aoa_to_sheet(monthlyRows)
+  wsMensal['!cols'] = [{ wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }]
+  XLSX.utils.book_append_sheet(wb, wsMensal, 'Por Mês')
+
+  // ── Aba 3: Por Tipo ────────────────────────────────────────────────────────
+  const typeRows = [
+    ['Tipo', 'Qtd. Ocorrências', '% do Total'],
+    ...data.byType.map((t) => [t.type, t.count, `${t.pct}%`]),
+  ]
+  const wsType = XLSX.utils.aoa_to_sheet(typeRows)
+  wsType['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 14 }]
+  XLSX.utils.book_append_sheet(wb, wsType, 'Por Tipo')
+
+  // ── Aba 4: Por Município ───────────────────────────────────────────────────
+  const cityRows = [
+    ['Município', 'Qtd. Ocorrências'],
+    ...data.byCity.map((c) => [c.city, c.count]),
+  ]
+  const wsCity = XLSX.utils.aoa_to_sheet(cityRows)
+  wsCity['!cols'] = [{ wch: 28 }, { wch: 18 }]
+  XLSX.utils.book_append_sheet(wb, wsCity, 'Por Município')
+
+  // ── Aba 5: Severidade ──────────────────────────────────────────────────────
+  const severityRows = [
+    ['Nível', 'Qtd. Ocorrências', '% do Total'],
+    ...data.bySeverity.map((s) => [s.label, s.count, `${s.pct}%`]),
+  ]
+  const wsSeverity = XLSX.utils.aoa_to_sheet(severityRows)
+  wsSeverity['!cols'] = [{ wch: 14 }, { wch: 18 }, { wch: 14 }]
+  XLSX.utils.book_append_sheet(wb, wsSeverity, 'Severidade')
+
+  // ── Aba 6: Status ──────────────────────────────────────────────────────────
+  const statusRows = [
+    ['Status', 'Qtd. Ocorrências', '% do Total'],
+    ...data.byStatus.map((s) => [s.label, s.count, `${s.pct}%`]),
+  ]
+  const wsStatus = XLSX.utils.aoa_to_sheet(statusRows)
+  wsStatus['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 14 }]
+  XLSX.utils.book_append_sheet(wb, wsStatus, 'Status')
+
+  XLSX.writeFile(wb, `SMDN_Relatorio_${period.replace(/\s+/g, '_')}.xlsx`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTES VISUAIS (independentes dos dados)
+// ─────────────────────────────────────────────────────────────────────────────
+const TYPE_COLORS = [
+  'bg-text-main',
+  'bg-status-severe',
+  'bg-status-regular',
+  'bg-action-inactive',
+  'bg-status-critical',
+  'bg-slate-400',
 ]
-
-const BY_TYPE = [
-  { type: 'Enchente', count: 42, pct: 34 },
-  { type: 'Deslizamento', count: 28, pct: 22 },
-  { type: 'Temporal', count: 21, pct: 17 },
-  { type: 'Tornado', count: 1, pct: 10 },
-  { type: 'Desabamento', count: 4, pct: 3 },
-]
-
-const BY_CITY = [
-  { city: 'São José dos Campos', count: 51 },
-  { city: 'Taubaté', count: 28 },
-  { city: 'Caraguatatuba', count: 22 },
-  { city: 'Jacareí', count: 17 },
-  { city: 'Pindamonhangaba', count: 12 },
-  { city: 'Guaratinguetá', count: 9 },
-]
-
-const BY_SEVERITY = [
-  { label: 'Crítico',  count: 58,  pct: 18, color: 'bg-status-critical', text: 'text-status-critical' },
-  { label: 'Grave',    count: 104, pct: 32, color: 'bg-status-severe',   text: 'text-status-severe'   },
-  { label: 'Moderado', count: 112, pct: 34, color: 'bg-status-regular',  text: 'text-status-regular'  },
-  { label: 'Normal',   count: 53,  pct: 16, color: 'bg-status-success',  text: 'text-status-success'  },
-]
-
-const BY_STATUS = [
-  { label: 'Resolvidas',   count: 291, pct: 89, color: '#02c602' },
-  { label: 'Em andamento', count: 24,  pct: 7,  color: '#ff6a00' },
-  { label: 'Pendentes',    count: 12,  pct: 4,  color: '#c60202' },
-]
-
-const TYPE_COLORS = ['bg-text-main', 'bg-status-severe', 'bg-status-regular', 'bg-action-inactive', 'bg-status-critical', 'bg-slate-400']
-
-const maxTotal = Math.max(...MONTHLY.map((m) => m.total))
-const maxCity  = Math.max(...BY_CITY.map((c) => c.count))
 
 const PERIODS = ['Últimos 7 dias', 'Últimos 30 dias', 'Últimos 6 meses', 'Último ano']
 
-const DONUT_R = 54
-const DONUT_CX = 70
-const DONUT_CY = 70
-const CIRCUMFERENCE = 2 * Math.PI * DONUT_R
+const DONUT_R          = 54
+const DONUT_CX         = 70
+const DONUT_CY         = 70
+const CIRCUMFERENCE    = 2 * Math.PI * DONUT_R
 
 function buildDonutSegments(items) {
   let offset = 0
@@ -65,19 +272,70 @@ function buildDonutSegments(items) {
   })
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENTE PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Relatorios() {
-  const [period, setPeriod] = useState('Últimos 6 meses')
-  const donutSegments = buildDonutSegments(BY_STATUS)
+  const [period, setPeriod]       = useState('Últimos 6 meses')
+  const [exporting, setExporting] = useState(null) // 'pdf' | 'excel' | null
+  const reportRef                 = useRef(null)
 
+  const { loading, data } = useReportData(period)
+
+  const maxTotal = Math.max(...data.monthly.map((m) => m.total))
+  const maxCity  = Math.max(...data.byCity.map((c) => c.count))
+  const donutSegments = buildDonutSegments(data.byStatus)
+
+  // ── Handlers de exportação ─────────────────────────────────────────────────
+  const handleExportPDF = useCallback(async () => {
+    if (!reportRef.current || exporting) return
+    setExporting('pdf')
+    try {
+      await exportToPDF(reportRef.current, period)
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err)
+      alert('Não foi possível gerar o PDF. Verifique o console.')
+    } finally {
+      setExporting(null)
+    }
+  }, [period, exporting])
+
+  const handleExportExcel = useCallback(() => {
+    if (exporting) return
+    setExporting('excel')
+    try {
+      exportToExcel(data, period)
+    } catch (err) {
+      console.error('Erro ao gerar Excel:', err)
+      alert('Não foi possível gerar o Excel. Verifique o console.')
+    } finally {
+      setExporting(null)
+    }
+  }, [data, period, exporting])
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="p-8 space-y-6 animate-fade-in">
 
-      {/* Header + KPIs + botões de export na mesma linha */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      {/* ── Barra de controles (período + exportação) ── */}
+      <div className="flex items-center justify-between flex-wrap gap-4" data-export-bar>
+        {/* KPIs */}
         <div className="flex gap-4 flex-wrap">
           {[
-            { label: 'TOTAL DE OCORRÊNCIAS', value: '327', delta: '+12%', positive: false, color: 'text-text-main' },
-            { label: 'TAXA DE RESOLUÇÃO',    value: '89%', delta: '+5%',  positive: true,  color: 'text-status-success' },
+            {
+              label:    'TOTAL DE OCORRÊNCIAS',
+              value:    String(data.kpis.total),
+              delta:    data.kpis.totalDelta,
+              positive: data.kpis.totalPositive,
+              color:    'text-text-main',
+            },
+            {
+              label:    'TAXA DE RESOLUÇÃO',
+              value:    data.kpis.resolutionRate,
+              delta:    data.kpis.resolutionDelta,
+              positive: data.kpis.resolutionPositive,
+              color:    'text-status-success',
+            },
           ].map((kpi) => (
             <Card key={kpi.label} className="py-4 min-w-[200px]">
               <p className="text-label text-slate-500 mb-1.5">{kpi.label}</p>
@@ -89,14 +347,18 @@ export default function Relatorios() {
           ))}
         </div>
 
-        {/* Seletor de período + botões de exportar empilhados */}
+        {/* Seletor de período + botões */}
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2 bg-bg-surface border border-border-soft rounded-lg p-1">
             {PERIODS.map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded text-xs font-semibold transition-all ${period === p ? 'bg-text-main text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+                  period === p
+                    ? 'bg-text-main text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
               >
                 {p}
               </button>
@@ -104,175 +366,195 @@ export default function Relatorios() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
+              onClick={handleExportPDF}
+              disabled={!!exporting}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-wait"
             >
-              <img src={externalIcon} width="13" height="13" alt="external-link" />
-              Exportar PDF
+              <img src={externalIcon} width="13" height="13" alt="" />
+              {exporting === 'pdf' ? 'Gerando…' : 'Exportar PDF'}
             </button>
             <button
-              onClick={() => alert('Exportar Excel')}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
+              onClick={handleExportExcel}
+              disabled={!!exporting}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-wait"
             >
-              <img src={externalIcon} width="13" height="13" alt="external-link" />
-              Exportar Excel
+              <img src={externalIcon} width="13" height="13" alt="" />
+              {exporting === 'excel' ? 'Gerando…' : 'Exportar Excel'}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Bar Chart - monthly */}
-        <Card className="lg:col-span-2">
-          <h3 className="text-card-title font-bold text-slate-800 mb-6">Ocorrências por Mês</h3>
-          <div className="flex items-end gap-3 h-48">
-            {MONTHLY.map((m) => (
-              <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="text-[10px] text-slate-400 font-bold">{m.total}</span>
-                <div className="w-full flex flex-col justify-end" style={{ height: '160px' }}>
-                  <div
-                    className="w-full rounded-t bg-text-main/20 relative overflow-hidden flex flex-col justify-end"
-                    style={{ height: `${(m.total / maxTotal) * 100}%` }}
-                  >
+      {/* ═══════════════════════════════════════════════════════════════════
+          ÁREA CAPTURADA PELO PDF
+          id="relatorio-content" + ref={reportRef}
+          Tudo abaixo daqui vai para o PDF; os controles acima ficam de fora.
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div id="relatorio-content" ref={reportRef} className="space-y-6 bg-bg-base rounded-xl">
+
+        {/* Gráfico de barras mensal + Por Tipo */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2">
+            <h3 className="text-card-title font-bold text-slate-800 mb-6">Ocorrências por Mês</h3>
+            <div className="flex items-end gap-3 h-48">
+              {data.monthly.map((m) => (
+                <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
+                  <span className="text-[10px] text-slate-400 font-bold">{m.total}</span>
+                  <div className="w-full flex flex-col justify-end" style={{ height: '160px' }}>
                     <div
-                      className="w-full bg-status-critical rounded-t"
-                      style={{ height: `${(m.critical / m.total) * 100}%` }}
-                    />
+                      className="w-full rounded-t bg-text-main/20 relative overflow-hidden flex flex-col justify-end"
+                      style={{ height: `${(m.total / maxTotal) * 100}%` }}
+                    >
+                      <div
+                        className="w-full bg-status-critical rounded-t"
+                        style={{ height: `${(m.critical / m.total) * 100}%` }}
+                      />
+                    </div>
                   </div>
+                  <span className="text-[11px] text-slate-500 font-medium">{m.month}</span>
                 </div>
-                <span className="text-[11px] text-slate-500 font-medium">{m.month}</span>
+              ))}
+            </div>
+            <div className="flex items-center gap-5 mt-4">
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-sm bg-text-main/20 block" />
+                <span className="text-xs text-slate-500">Total</span>
               </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-5 mt-4">
-            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-text-main/20 block" /><span className="text-xs text-slate-500">Total</span></div>
-            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-status-critical block" /><span className="text-xs text-slate-500">Críticos</span></div>
-          </div>
-        </Card>
-
-        {/* Type breakdown */}
-        <Card>
-          <h3 className="text-card-title font-bold text-slate-800 mb-5">Por Tipo</h3>
-          <div className="space-y-3">
-            {BY_TYPE.map((t, i) => (
-              <div key={t.type}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-600 font-medium">{t.type}</span>
-                  <span className="text-slate-400 font-bold">{t.count}</span>
-                </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${TYPE_COLORS[i]}`}
-                    style={{ width: `${t.pct}%`, transition: 'width 0.6s ease' }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      {/* Distribuição de Severidade + Status das Ocorrências */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <Card>
-          <h3 className="text-card-title font-bold text-slate-800 mb-5">Distribuição de Severidade</h3>
-          <div className="space-y-4">
-            {BY_SEVERITY.map((s) => (
-              <div key={s.label}>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className={`font-bold ${s.text}`}>{s.label}</span>
-                  <span className="text-slate-400 font-bold">{s.count} <span className="text-slate-300">({s.pct}%)</span></span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${s.color}`}
-                    style={{ width: `${s.pct}%`, transition: 'width 0.7s ease' }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-4 gap-2 mt-5 pt-4 border-t border-border-soft">
-            {BY_SEVERITY.map((s) => (
-              <div key={s.label} className="text-center">
-                <p className={`text-lg font-bold ${s.text}`}>{s.pct}%</p>
-                <p className="text-[10px] text-slate-400 font-semibold">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <h3 className="text-card-title font-bold text-slate-800 mb-5">Status das Ocorrências</h3>
-          <div className="flex items-center gap-8">
-            <div className="relative flex-shrink-0">
-              <svg width="140" height="140" viewBox="0 0 140 140">
-                <circle cx={DONUT_CX} cy={DONUT_CY} r={DONUT_R} fill="none" stroke="#f1f5f9" strokeWidth="16" />
-                {donutSegments.map((seg) => (
-                  <circle
-                    key={seg.label}
-                    cx={DONUT_CX}
-                    cy={DONUT_CY}
-                    r={DONUT_R}
-                    fill="none"
-                    stroke={seg.color}
-                    strokeWidth="16"
-                    strokeDasharray={`${seg.dash} ${seg.gap}`}
-                    strokeDashoffset={-seg.offset}
-                    transform={`rotate(-90 ${DONUT_CX} ${DONUT_CY})`}
-                    style={{ transition: 'stroke-dasharray 0.7s ease' }}
-                  />
-                ))}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-slate-800">327</span>
-                <span className="text-[10px] text-slate-400 font-semibold">total</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-sm bg-status-critical block" />
+                <span className="text-xs text-slate-500">Críticos</span>
               </div>
             </div>
-            <div className="flex-1 space-y-4">
-              {BY_STATUS.map((s) => (
-                <div key={s.label}>
+          </Card>
+
+          <Card>
+            <h3 className="text-card-title font-bold text-slate-800 mb-5">Por Tipo</h3>
+            <div className="space-y-3">
+              {data.byType.map((t, i) => (
+                <div key={t.type}>
                   <div className="flex justify-between text-xs mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-                      <span className="text-slate-600 font-medium">{s.label}</span>
-                    </div>
-                    <span className="font-bold text-slate-700">{s.count}</span>
+                    <span className="text-slate-600 font-medium">{t.type}</span>
+                    <span className="text-slate-400 font-bold">{t.count}</span>
                   </div>
-                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full"
-                      style={{ width: `${s.pct}%`, backgroundColor: s.color, transition: 'width 0.7s ease' }}
+                      className={`h-full rounded-full ${TYPE_COLORS[i]}`}
+                      style={{ width: `${t.pct}%`, transition: 'width 0.6s ease' }}
                     />
                   </div>
                 </div>
               ))}
             </div>
+          </Card>
+        </div>
+
+        {/* Severidade + Status */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <h3 className="text-card-title font-bold text-slate-800 mb-5">Distribuição de Severidade</h3>
+            <div className="space-y-4">
+              {data.bySeverity.map((s) => (
+                <div key={s.label}>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className={`font-bold ${s.text}`}>{s.label}</span>
+                    <span className="text-slate-400 font-bold">
+                      {s.count} <span className="text-slate-300">({s.pct}%)</span>
+                    </span>
+                  </div>
+                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${s.color}`}
+                      style={{ width: `${s.pct}%`, transition: 'width 0.7s ease' }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-4 gap-2 mt-5 pt-4 border-t border-border-soft">
+              {data.bySeverity.map((s) => (
+                <div key={s.label} className="text-center">
+                  <p className={`text-lg font-bold ${s.text}`}>{s.pct}%</p>
+                  <p className="text-[10px] text-slate-400 font-semibold">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <h3 className="text-card-title font-bold text-slate-800 mb-5">Status das Ocorrências</h3>
+            <div className="flex items-center gap-8">
+              <div className="relative flex-shrink-0">
+                <svg width="140" height="140" viewBox="0 0 140 140">
+                  <circle cx={DONUT_CX} cy={DONUT_CY} r={DONUT_R} fill="none" stroke="#f1f5f9" strokeWidth="16" />
+                  {donutSegments.map((seg) => (
+                    <circle
+                      key={seg.label}
+                      cx={DONUT_CX}
+                      cy={DONUT_CY}
+                      r={DONUT_R}
+                      fill="none"
+                      stroke={seg.color}
+                      strokeWidth="16"
+                      strokeDasharray={`${seg.dash} ${seg.gap}`}
+                      strokeDashoffset={-seg.offset}
+                      transform={`rotate(-90 ${DONUT_CX} ${DONUT_CY})`}
+                      style={{ transition: 'stroke-dasharray 0.7s ease' }}
+                    />
+                  ))}
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-bold text-slate-800">{data.kpis.total}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold">total</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-4">
+                {data.byStatus.map((s) => (
+                  <div key={s.label}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                        <span className="text-slate-600 font-medium">{s.label}</span>
+                      </div>
+                      <span className="font-bold text-slate-700">{s.count}</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width:           `${s.pct}%`,
+                          backgroundColor: s.color,
+                          transition:      'width 0.7s ease',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Por Município */}
+        <Card>
+          <h3 className="text-card-title font-bold text-slate-800 mb-5">Ocorrências por Município</h3>
+          <div className="space-y-3">
+            {data.byCity.map((c) => (
+              <div key={c.city} className="flex items-center gap-4">
+                <span className="text-sm text-slate-600 w-40 font-medium truncate">{c.city}</span>
+                <div className="flex-1 h-6 bg-slate-100 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-text-main to-action-hover flex items-center justify-end pr-2 rounded transition-all duration-700"
+                    style={{ width: `${(c.count / maxCity) * 100}%` }}
+                  >
+                    <span className="text-white text-[11px] font-bold">{c.count}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
 
-      </div>
-
-      {/* By city */}
-      <Card>
-        <h3 className="text-card-title font-bold text-slate-800 mb-5">Ocorrências por Município</h3>
-        <div className="space-y-3">
-          {BY_CITY.map((c) => (
-            <div key={c.city} className="flex items-center gap-4">
-              <span className="text-sm text-slate-600 w-40 font-medium truncate">{c.city}</span>
-              <div className="flex-1 h-6 bg-slate-100 rounded overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-text-main to-action-hover flex items-center justify-end pr-2 rounded transition-all duration-700"
-                  style={{ width: `${(c.count / maxCity) * 100}%` }}
-                >
-                  <span className="text-white text-[11px] font-bold">{c.count}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+      </div>{/* fim #relatorio-content */}
     </div>
   )
 }
