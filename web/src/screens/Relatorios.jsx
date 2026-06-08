@@ -72,7 +72,7 @@ export default function Relatorios() {
   return (
     <div className="p-8 space-y-6 animate-fade-in">
 
-      {/* Header + KPIs na mesma linha */}
+      {/* Header + KPIs + botões de export na mesma linha */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex gap-4 flex-wrap">
           {[
@@ -88,35 +88,37 @@ export default function Relatorios() {
             </Card>
           ))}
         </div>
-        <div className="flex items-center gap-2 bg-bg-surface border border-border-soft rounded-lg p-1">
-          {PERIODS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all ${period === p ? 'bg-text-main text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {/* Export buttons */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
-        >
-          <img src={externalIcon} width="13" height="13" alt="external-link" />
-          Exportar PDF
-        </button>
-        <button
-          onClick={() => alert('Exportar Excel')}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
-        >
-          <img src={externalIcon} width="13" height="13" alt="external-link" />
-          Exportar Excel
-        </button>
+        {/* Seletor de período + botões de exportar empilhados */}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2 bg-bg-surface border border-border-soft rounded-lg p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition-all ${period === p ? 'bg-text-main text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
+            >
+              <img src={externalIcon} width="13" height="13" alt="external-link" />
+              Exportar PDF
+            </button>
+            <button
+              onClick={() => alert('Exportar Excel')}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all"
+            >
+              <img src={externalIcon} width="13" height="13" alt="external-link" />
+              Exportar Excel
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
