@@ -43,9 +43,9 @@ export default function Perfil() {
   const initials = form.name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
+    <div className="p-8 flex flex-col gap-6 animate-fade-in h-full min-h-full">
       {saved && (
-        <div className="flex items-center gap-3 bg-status-success-bg border border-status-success/30 text-status-success font-semibold text-sm px-4 py-3 rounded-lg animate-slide-up">
+        <div className="flex items-center gap-3 bg-status-success-bg border border-status-success/30 text-status-success font-semibold text-sm px-4 py-3 rounded-lg animate-slide-up flex-shrink-0">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <circle cx="9" cy="9" r="7" fill="currentColor" opacity=".15" />
             <path d="M5.5 9l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -54,9 +54,9 @@ export default function Perfil() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         {/* Identity card */}
-        <Card className="lg:col-span-1 flex flex-col items-center text-center py-8 gap-4">
+        <Card className="lg:col-span-1 flex flex-col items-center text-center py-8 gap-4 h-full">
           {/* Avatar */}
           <div className="w-20 h-20 rounded-full bg-text-main/20 border-4 border-text-main/30 flex items-center justify-center">
             <span className="text-2xl font-bold text-text-main">{initials}</span>
@@ -96,7 +96,7 @@ export default function Perfil() {
         </Card>
 
         {/* Info + Permissions + Activity */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 flex flex-col gap-5 h-full">
           {/* Permissions */}
           <Card>
             <h3 className="text-card-title font-bold text-slate-800 mb-4">Permissões de Acesso</h3>
@@ -121,7 +121,7 @@ export default function Perfil() {
           </Card>
 
           {/* Recent Activity */}
-          <Card>
+          <Card className="flex-1">
             <h3 className="text-card-title font-bold text-slate-800 mb-4">Atividade Recente</h3>
             <div className="space-y-2.5">
               {ACTIVITY.map((a, i) => (
@@ -151,13 +151,6 @@ export default function Perfil() {
             <div>
               <label className="block text-label text-slate-600 mb-1.5">TELEFONE</label>
               <input className="input-field" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-            </div>
-          </div>
-          <div className="border-t border-border-soft pt-3">
-            <p className="text-label text-slate-400 mb-2">ALTERAR SENHA</p>
-            <div className="grid grid-cols-2 gap-3">
-              <input className="input-field" type="password" placeholder="Nova senha" />
-              <input className="input-field" type="password" placeholder="Confirmar senha" />
             </div>
           </div>
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-border-soft">
