@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
 import MapView from '../components/MapView'
@@ -63,6 +63,109 @@ function formatDate(iso) {
   })
 }
 
+// ── Autocomplete hook ────────────────────────────────────────────────────────
+function useCityAutocomplete(query) {
+  const [suggestions, setSuggestions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    if (!query || query.length < 2) {
+      setSuggestions([])
+      return
+    }
+
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=br&q=${encodeURIComponent(query)}`
+        const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
+        const data = await res.json()
+
+        // Filtra apenas municípios/cidades, deduplicando pelo nome normalizado
+        const seen = new Set()
+        const cities = []
+        for (const item of data) {
+          const addr = item.address || {}
+          const cityName =
+            addr.city || addr.town || addr.municipality || addr.village || ''
+          const state = addr.state || ''
+          if (!cityName) continue
+          const key = `${cityName.toLowerCase()}|${state.toLowerCase()}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          cities.push({
+            displayName: `${cityName}${state ? `, ${state}` : ''}`,
+            city: cityName,
+            state,
+            lat: parseFloat(item.lat),
+            lon: parseFloat(item.lon),
+          })
+        }
+        setSuggestions(cities)
+      } catch {
+        setSuggestions([])
+      } finally {
+        setLoading(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(debounceRef.current)
+  }, [query])
+
+  return { suggestions, loading, clear: () => setSuggestions([]) }
+}
+
+// ── Neighborhood autocomplete hook ──────────────────────────────────────────
+function useNeighborhoodAutocomplete(query, cityName) {
+  const [suggestions, setSuggestions] = useState([])
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    if (!query || query.length < 2) {
+      setSuggestions([])
+      return
+    }
+
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const searchQuery = cityName ? `${query}, ${cityName}, Brasil` : `${query}, Brasil`
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=br&q=${encodeURIComponent(searchQuery)}`
+        const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
+        const data = await res.json()
+
+        const seen = new Set()
+        const results = []
+        for (const item of data) {
+          const addr = item.address || {}
+          const neighborhood =
+            addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || ''
+          if (!neighborhood) continue
+          const key = neighborhood.toLowerCase()
+          if (seen.has(key)) continue
+          seen.add(key)
+          results.push({
+            displayName: neighborhood,
+            neighborhood,
+            lat: parseFloat(item.lat),
+            lon: parseFloat(item.lon),
+            boundingbox: item.boundingbox,
+          })
+        }
+        setSuggestions(results)
+      } catch {
+        setSuggestions([])
+      }
+    }, 300)
+
+    return () => clearTimeout(debounceRef.current)
+  }, [query, cityName])
+
+  return { suggestions, clear: () => setSuggestions([]) }
+}
+
 export default function Reportar() {
   const [alerts] = useState(MOCK_ALERTS)
   const [filterSeverity, setFilterSeverity] = useState('')
@@ -75,25 +178,51 @@ export default function Reportar() {
   const [isMapOpen, setIsMapOpen] = useState(false)
   const [autoFilled, setAutoFilled] = useState(false)
 
+  // Autocomplete state
+  const [cityInputValue, setCityInputValue] = useState('')
+  const [neighborhoodInputValue, setNeighborhoodInputValue] = useState('')
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false)
+  const [showNeighborhoodSuggestions, setShowNeighborhoodSuggestions] = useState(false)
+  const cityWrapperRef = useRef(null)
+  const neighborhoodWrapperRef = useRef(null)
   const mapRef = useRef(null)
 
-  // targetLocation derivado do form — passado ao MapView para geocodificar e dar zoom
-  const targetLocation = (form.city || form.neighborhood)
-    ? { city: form.city, neighborhood: form.neighborhood }
-    : null
+  const { suggestions: citySuggestions, loading: cityLoading, clear: clearCitySuggestions } = useCityAutocomplete(cityInputValue)
+  const { suggestions: neighborhoodSuggestions, clear: clearNeighborhoodSuggestions } = useNeighborhoodAutocomplete(neighborhoodInputValue, form.city)
+
+  // targetLocation passado ao MapView — agora inclui lat/lon para voar sem re-geocodificar
+  const [targetLocation, setTargetLocation] = useState(null)
+
+  // Fechar dropdowns ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (cityWrapperRef.current && !cityWrapperRef.current.contains(e.target)) {
+        setShowCitySuggestions(false)
+      }
+      if (neighborhoodWrapperRef.current && !neighborhoodWrapperRef.current.contains(e.target)) {
+        setShowNeighborhoodSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleDispatch = () => {
-    // TODO: Supabase insert + send push notifications
     setIsModalOpen(false)
     setSuccessMsg(true)
     setForm({ type: '', city: '', severity: 'critical', description: '', neighborhood: '' })
+    setCityInputValue('')
+    setNeighborhoodInputValue('')
+    setTargetLocation(null)
     setTimeout(() => setSuccessMsg(false), 4000)
   }
 
+  // Mapa clicado: preenche cidade + bairro via reverse geocode, mas NÃO fecha o mapa
   const handleMapClick = async (lat, lng) => {
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        { headers: { 'Accept-Language': 'pt-BR' } }
       )
       const data = await response.json()
 
@@ -111,11 +240,39 @@ export default function Reportar() {
         ''
 
       setForm((prev) => ({ ...prev, city, neighborhood }))
+      setCityInputValue(city)
+      setNeighborhoodInputValue(neighborhood)
       setAutoFilled(true)
-      setIsMapOpen(false)
+      // NÃO fecha o mapa — usuário sai manualmente
     } catch (error) {
       console.error('Erro ao localizar endereço:', error)
     }
+  }
+
+  const handleCitySelect = (suggestion) => {
+    setForm((f) => ({ ...f, city: suggestion.city }))
+    setCityInputValue(suggestion.displayName)
+    setAutoFilled(false)
+    clearCitySuggestions()
+    setShowCitySuggestions(false)
+    // Atualiza o mapa se estiver aberto
+    setTargetLocation({ city: suggestion.city, lat: suggestion.lat, lon: suggestion.lon })
+  }
+
+  const handleNeighborhoodSelect = (suggestion) => {
+    setForm((f) => ({ ...f, neighborhood: suggestion.neighborhood }))
+    setNeighborhoodInputValue(suggestion.displayName)
+    setAutoFilled(false)
+    clearNeighborhoodSuggestions()
+    setShowNeighborhoodSuggestions(false)
+    // Passa boundingbox para o mapa desenhar o anel ao redor do bairro
+    setTargetLocation({
+      city: form.city,
+      neighborhood: suggestion.neighborhood,
+      lat: suggestion.lat,
+      lon: suggestion.lon,
+      boundingbox: suggestion.boundingbox,
+    })
   }
 
   const filteredAlerts = alerts.filter((alert) => {
@@ -254,18 +411,50 @@ export default function Reportar() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            {/* City with autocomplete */}
+            <div ref={cityWrapperRef} className="relative">
               <label className="block text-label text-slate-600 mb-1.5">MUNICÍPIO</label>
-              <input
-                className={`input-field ${autoFilled ? 'border border-[#597891] ring-1 ring-[#597891]/20' : ''}`}
-                placeholder="Município será preenchido pelo mapa"
-                value={form.city}
-                onChange={(e) => {
-                  setAutoFilled(false)
-                  setForm((f) => ({ ...f, city: e.target.value }))
-                }}
-              />
+              <div className="relative">
+                <input
+                  className={`input-field w-full pr-7 ${autoFilled ? 'border border-[#597891] ring-1 ring-[#597891]/20' : ''}`}
+                  placeholder="Digite o município..."
+                  value={cityInputValue}
+                  onChange={(e) => {
+                    setCityInputValue(e.target.value)
+                    setForm((f) => ({ ...f, city: e.target.value }))
+                    setAutoFilled(false)
+                    setShowCitySuggestions(true)
+                  }}
+                  onFocus={() => cityInputValue.length >= 2 && setShowCitySuggestions(true)}
+                  autoComplete="off"
+                />
+                {cityLoading && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                    <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
+                    </svg>
+                  </span>
+                )}
+              </div>
+              {showCitySuggestions && citySuggestions.length > 0 && (
+                <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                  {citySuggestions.map((s, i) => (
+                    <li
+                      key={i}
+                      className="px-3 py-2 text-sm text-slate-700 hover:bg-[#597891]/10 cursor-pointer flex items-center gap-2 transition-colors"
+                      onMouseDown={() => handleCitySelect(s)}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[#597891]">
+                        <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.485-2.015-4.5-4.5-4.5Z" stroke="currentColor" strokeWidth="1.4"/>
+                        <circle cx="8" cy="6" r="1.5" fill="currentColor"/>
+                      </svg>
+                      {s.displayName}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+
             <div>
               <label className="block text-label text-slate-600 mb-1.5">SEVERIDADE</label>
               <select
@@ -280,17 +469,39 @@ export default function Reportar() {
             </div>
           </div>
 
-          <div>
+          {/* Neighborhood with autocomplete */}
+          <div ref={neighborhoodWrapperRef} className="relative">
             <label className="block text-label text-slate-600 mb-1.5">BAIRRO / ÁREA (opcional)</label>
             <input
-              className={`input-field ${autoFilled ? 'border border-[#597891] ring-1 ring-[#597891]/20' : ''}`}
+              className={`input-field w-full ${autoFilled ? 'border border-[#597891] ring-1 ring-[#597891]/20' : ''}`}
               placeholder="Ex: Centro, Vila Nova..."
-              value={form.neighborhood}
+              value={neighborhoodInputValue}
               onChange={(e) => {
-                setAutoFilled(false)
+                setNeighborhoodInputValue(e.target.value)
                 setForm((f) => ({ ...f, neighborhood: e.target.value }))
+                setAutoFilled(false)
+                setShowNeighborhoodSuggestions(true)
               }}
+              onFocus={() => neighborhoodInputValue.length >= 2 && setShowNeighborhoodSuggestions(true)}
+              autoComplete="off"
             />
+            {showNeighborhoodSuggestions && neighborhoodSuggestions.length > 0 && (
+              <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                {neighborhoodSuggestions.map((s, i) => (
+                  <li
+                    key={i}
+                    className="px-3 py-2 text-sm text-slate-700 hover:bg-[#597891]/10 cursor-pointer flex items-center gap-2 transition-colors"
+                    onMouseDown={() => handleNeighborhoodSelect(s)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[#597891]">
+                      <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+                      <path d="M5 8h6M8 5v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    </svg>
+                    {s.displayName}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <button
@@ -300,7 +511,7 @@ export default function Reportar() {
             Localizar Área no Mapa
           </button>
 
-          {/* Modal do mapa — com ref e targetLocation */}
+          {/* Modal do mapa — NÃO fecha ao clicar, só fecha via onClose */}
           <Modal
             isOpen={isMapOpen}
             onClose={() => setIsMapOpen(false)}
