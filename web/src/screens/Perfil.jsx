@@ -1,43 +1,124 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
 import { useAuth } from '../hooks/useAuth.js'
+import {
+  buildProfileChanges,
+  hasProfileChanges,
+  requestProfileChange,
+  updateOwnProfileDirect,
+} from '../services/profileChangeService.js'
 
 const PERMISSIONS = [
   { key: 'dashboard', label: 'Dashboard', granted: true },
   { key: 'reportar', label: 'Reportar / Disparar Alertas', granted: true },
   { key: 'ocorrencias', label: 'Gerenciar Ocorrências', granted: true },
   { key: 'relatorios', label: 'Relatórios Analíticos', granted: true },
-  { key: 'auditoria', label: 'Auditoria', granted: false },
-  { key: 'admin', label: 'Administração de Usuários', granted: false },
+  { key: 'auditoria', label: 'Auditoria', granted: true },
+  { key: 'admin', label: 'Administração de Usuários', granted: true },
 ]
 
 const ACTIVITY = [
-  { action: 'Alerta disparado', target: 'Enchente – São José dos Campos', at: '10/01 08:22' },
-  { action: 'Ocorrência registrada', target: 'OC-001 – Jardim Aquarius', at: '10/01 08:18' },
-  { action: 'Login', target: 'Acesso autorizado', at: '10/01 09:05' },
-  { action: 'Ocorrência atualizada', target: 'OC-007 – Bom Retiro, Taubaté', at: '09/01 15:35' },
+  { action: 'Login', target: 'Acesso autorizado', at: 'Agora' },
+  { action: 'Perfil', target: 'Dados sincronizados com Supabase', at: 'Hoje' },
 ]
 
-export default function Perfil() {
-  const { user, setUser } = useAuth()
-  const [isEditing, setIsEditing] = useState(false)
-  const [form, setForm] = useState({
+function makeInitialForm(user) {
+  return {
     name: user?.name || '',
-    email: user?.email || '',
-    role: user?.role || '',
-    phone: '(12) 99999-0000',
+    email: user?.contactEmail || user?.perfil?.prf_email_contato || user?.email || '',
+    role: user?.roleLabel || user?.role || '',
+    phone: user?.phone || user?.perfil?.prf_telefone || '',
     cpf: '***.***.***-00',
-    institution: 'Defesa Civil do Estado de São Paulo',
-  })
-  const [saved, setSaved] = useState(false)
+    institution: user?.instituicao?.ins_numero || 'SMDN',
+    newPassword: '',
+    requestPasswordReset: false,
+  }
+}
 
-  const handleSave = () => {
-    // TODO: Supabase update
-    setUser((u) => ({ ...u, name: form.name, email: form.email, role: form.role }))
-    setIsEditing(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+function ChangePreview({ changes }) {
+  const entries = Object.entries(changes || {})
+  if (entries.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800 space-y-1">
+      <p className="font-bold">Alterações detectadas</p>
+      {entries.map(([key, change]) => (
+        <p key={key}>
+          <strong>{change.label}:</strong> {change.old} → {change.new}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+export default function Perfil() {
+  const { user, setUser, isAdmin } = useAuth()
+  const [isEditing, setIsEditing] = useState(false)
+  const [form, setForm] = useState(makeInitialForm(user))
+  const [saved, setSaved] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setForm(makeInitialForm(user))
+  }, [user?.id])
+
+  const changes = buildProfileChanges({
+    currentUser: user,
+    form,
+    requestPasswordReset: !isAdmin && form.requestPasswordReset,
+  })
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError('')
+    setNotice('')
+
+    try {
+      if (isAdmin) {
+        const updatedProfile = await updateOwnProfileDirect({
+          currentUser: user,
+          form,
+          newPassword: form.newPassword,
+        })
+
+        setUser((current) => ({
+          ...current,
+          name: updatedProfile.prf_nome || current.name,
+          contactEmail: updatedProfile.prf_email_contato || current.email,
+          phone: updatedProfile.prf_telefone || '',
+          perfil: {
+            ...(current.perfil || {}),
+            ...updatedProfile,
+          },
+        }))
+
+        setNotice('Perfil atualizado diretamente. Administradores não precisam de aprovação.')
+      } else {
+        if (!hasProfileChanges(changes)) {
+          throw new Error('Nenhuma alteração foi informada.')
+        }
+
+        await requestProfileChange({
+          currentUser: user,
+          form,
+          requestPasswordReset: form.requestPasswordReset,
+        })
+
+        setNotice('Solicitação enviada. Um administrador precisa aprovar a alteração.')
+      }
+
+      setForm((current) => ({ ...current, newPassword: '', requestPasswordReset: false }))
+      setIsEditing(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 4000)
+    } catch (err) {
+      setError(err.message || 'Não foi possível salvar as alterações.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const initials = form.name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
@@ -50,14 +131,12 @@ export default function Perfil() {
             <circle cx="9" cy="9" r="7" fill="currentColor" opacity=".15" />
             <path d="M5.5 9l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Perfil atualizado com sucesso!
+          {notice || 'Alteração registrada com sucesso.'}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-        {/* Identity card */}
         <Card className="lg:col-span-1 flex flex-col items-center text-center py-8 gap-4 h-full">
-          {/* Avatar */}
           <div className="w-20 h-20 rounded-full bg-text-main/20 border-4 border-text-main/30 flex items-center justify-center">
             <span className="text-2xl font-bold text-text-main">{initials}</span>
           </div>
@@ -67,37 +146,24 @@ export default function Perfil() {
           </div>
           <div className="w-full border-t border-border-soft pt-4 space-y-2 text-sm text-slate-600 text-left">
             <div className="flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-slate-400 flex-shrink-0">
-                <path d="M13 5c0 5-5 8-5 8S3 10 3 5a5 5 0 0 1 10 0Z" stroke="currentColor" strokeWidth="1.4" fill="none" />
-                <circle cx="8" cy="5" r="1.5" fill="currentColor" />
-              </svg>
+              <span className="w-4 text-slate-400">⌂</span>
               <span>{form.institution}</span>
             </div>
             <div className="flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-slate-400 flex-shrink-0">
-                <rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
-                <path d="M2 6l6 4 6-4" stroke="currentColor" strokeWidth="1.2" />
-              </svg>
+              <span className="w-4 text-slate-400">✉</span>
               <span className="truncate">{form.email}</span>
             </div>
             <div className="flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-slate-400 flex-shrink-0">
-                <path d="M3 3h2l1 3-1.5 1.5a9 9 0 0 0 3 3L9 9l3 1v2a1 1 0 0 1-1 1C5.5 13 3 7.5 3 4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.3" fill="none" />
-              </svg>
-              <span>{form.phone}</span>
+              <span className="w-4 text-slate-400">☎</span>
+              <span>{form.phone || 'Telefone não informado'}</span>
             </div>
           </div>
-          <button
-            className="btn-primary w-full mt-2"
-            onClick={() => setIsEditing(true)}
-          >
+          <button className="btn-primary w-full mt-2" onClick={() => setIsEditing(true)}>
             Editar Perfil
           </button>
         </Card>
 
-        {/* Info + Permissions + Activity */}
         <div className="lg:col-span-2 flex flex-col gap-5 h-full">
-          {/* Permissions */}
           <Card>
             <h3 className="text-card-title font-bold text-slate-800 mb-4">Permissões de Acesso</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -120,7 +186,6 @@ export default function Perfil() {
             </div>
           </Card>
 
-          {/* Recent Activity */}
           <Card className="flex-1">
             <h3 className="text-card-title font-bold text-slate-800 mb-4">Atividade Recente</h3>
             <div className="space-y-2.5">
@@ -136,16 +201,27 @@ export default function Perfil() {
         </div>
       </div>
 
-      {/* Edit Modal */}
       <Modal isOpen={isEditing} onClose={() => setIsEditing(false)} title="Editar Perfil" size="md">
         <div className="space-y-4">
+          {error && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {!isAdmin && (
+            <div className="rounded-xl border border-yellow-100 bg-yellow-50 px-4 py-3 text-xs text-yellow-800 leading-relaxed">
+              Usuários comuns solicitam alteração para aprovação. Administradores alteram diretamente.
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-label text-slate-600 mb-1.5">NOME COMPLETO</label>
               <input className="input-field" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-label text-slate-600 mb-1.5">E-MAIL</label>
+              <label className="block text-label text-slate-600 mb-1.5">E-MAIL DE CONTATO</label>
               <input type="email" className="input-field" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
             </div>
             <div>
@@ -153,9 +229,36 @@ export default function Perfil() {
               <input className="input-field" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
             </div>
           </div>
+
+          {isAdmin ? (
+            <div>
+              <label className="block text-label text-slate-600 mb-1.5">NOVA SENHA DO ADMIN OPCIONAL</label>
+              <input
+                type="password"
+                className="input-field"
+                value={form.newPassword}
+                placeholder="Deixe em branco para não alterar"
+                onChange={(e) => setForm((f) => ({ ...f, newPassword: e.target.value }))}
+              />
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={form.requestPasswordReset}
+                onChange={(e) => setForm((f) => ({ ...f, requestPasswordReset: e.target.checked }))}
+              />
+              Solicitar redefinição de senha ao administrador
+            </label>
+          )}
+
+          {!isAdmin && <ChangePreview changes={changes} />}
+
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-border-soft">
-            <button className="btn-ghost" onClick={() => setIsEditing(false)}>Cancelar</button>
-            <button className="btn-primary" onClick={handleSave}>Salvar Alterações</button>
+            <button className="btn-ghost" onClick={() => setIsEditing(false)} disabled={saving}>Cancelar</button>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Salvando...' : isAdmin ? 'Salvar Alterações' : 'Enviar Solicitação'}
+            </button>
           </div>
         </div>
       </Modal>

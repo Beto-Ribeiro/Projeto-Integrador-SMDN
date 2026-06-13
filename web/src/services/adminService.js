@@ -14,6 +14,18 @@ function emptyBecauseMissingSchema(error) {
   }
 }
 
+async function getCurrentUserId() {
+  const { data } = await supabase.auth.getUser()
+  return data?.user?.id || null
+}
+
+async function safeAuditLog(payload) {
+  const { error } = await supabase.from('Audit_Log').insert(payload)
+  if (error && !isMissingRelationError(error)) {
+    console.warn('Não foi possível registrar auditoria:', error.message)
+  }
+}
+
 export async function listAccessRequests() {
   const { data, error } = await supabase
     .from('Solicitacao_Acesso_Web')
@@ -30,10 +42,26 @@ export async function listAccessRequests() {
   return { data: data || [], missingSchema: false }
 }
 
+export async function listProfileChangeRequests() {
+  const { data, error } = await supabase
+    .from('Solicitacao_Alteracao_Perfil')
+    .select(
+      'sap_id, sap_user_id, sap_nome_solicitante, sap_email_solicitante, sap_alteracoes, sap_status, sap_observacao, sap_created_at, sap_reviewed_by, sap_reviewed_at'
+    )
+    .order('sap_created_at', { ascending: false })
+
+  if (error) {
+    if (isMissingRelationError(error)) return emptyBecauseMissingSchema(error)
+    throw error
+  }
+
+  return { data: data || [], missingSchema: false }
+}
+
 export async function listWebProfiles() {
   const { data, error } = await supabase
     .from('Perfis')
-    .select('prf_id, prf_nome, prf_tipo, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_created_at')
     .order('prf_created_at', { ascending: false })
 
   if (error) {
@@ -47,7 +75,7 @@ export async function listWebProfiles() {
 export async function listAuditLogs() {
   const { data, error } = await supabase
     .from('Audit_Log')
-    .select('log_id, actor_user_id, action, entity_type, entity_id, detail, created_at')
+    .select('log_id, actor_user_id, action, entity_type, entity_id, detail, metadata, created_at')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -60,11 +88,14 @@ export async function listAuditLogs() {
 }
 
 export async function rejectAccessRequest(requestId, observation = '') {
+  const actorUserId = await getCurrentUserId()
+
   const { data, error } = await supabase
     .from('Solicitacao_Acesso_Web')
     .update({
       saw_status: 'recusado',
       saw_observacao: observation || null,
+      saw_reviewed_by: actorUserId,
       saw_reviewed_at: new Date().toISOString(),
     })
     .eq('saw_id', requestId)
@@ -72,6 +103,14 @@ export async function rejectAccessRequest(requestId, observation = '') {
     .single()
 
   if (error) throw error
+
+  await safeAuditLog({
+    actor_user_id: actorUserId,
+    action: 'access_request_rejected',
+    entity_type: 'Solicitacao_Acesso_Web',
+    entity_id: requestId,
+    detail: observation || 'Solicitação de acesso recusada.',
+  })
 
   return data
 }
@@ -89,6 +128,89 @@ export async function approveAccessRequest(requestId) {
       'Aprovação automática depende da Edge Function approve-web-access-request. O painel já está preparado, mas a função ainda precisa ser criada/deployada no Supabase.'
     )
   }
+
+  return data
+}
+
+function buildProfileUpdateFromChanges(changes = {}) {
+  const payload = {}
+
+  if (changes.name?.new) payload.prf_nome = changes.name.new
+  if (changes.phone) payload.prf_telefone = changes.phone.new === '—' ? null : changes.phone.new
+  if (changes.email?.new) payload.prf_email_contato = changes.email.new
+
+  return payload
+}
+
+export async function approveProfileChangeRequest(request) {
+  const actorUserId = await getCurrentUserId()
+  const changes = request.sap_alteracoes || {}
+  const profileUpdate = buildProfileUpdateFromChanges(changes)
+
+  if (Object.keys(profileUpdate).length > 0) {
+    const { error: profileError } = await supabase
+      .from('Perfis')
+      .update(profileUpdate)
+      .eq('prf_id', request.sap_user_id)
+
+    if (profileError) throw profileError
+  }
+
+  const passwordMessage = changes.password
+    ? ' Solicitação de senha marcada como aprovada; redefina a senha manualmente no Supabase Auth se necessário.'
+    : ''
+
+  const { data, error } = await supabase
+    .from('Solicitacao_Alteracao_Perfil')
+    .update({
+      sap_status: 'aprovado',
+      sap_observacao: `Aprovado pelo painel administrativo.${passwordMessage}`,
+      sap_reviewed_by: actorUserId,
+      sap_reviewed_at: new Date().toISOString(),
+    })
+    .eq('sap_id', request.sap_id)
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  await safeAuditLog({
+    actor_user_id: actorUserId,
+    action: 'profile_change_approved',
+    entity_type: 'Solicitacao_Alteracao_Perfil',
+    entity_id: request.sap_id,
+    detail: `Alteração de perfil aprovada para ${request.sap_nome_solicitante || request.sap_email_solicitante || request.sap_user_id}.${passwordMessage}`,
+    metadata: { changes },
+  })
+
+  return data
+}
+
+export async function rejectProfileChangeRequest(request, observation = '') {
+  const actorUserId = await getCurrentUserId()
+
+  const { data, error } = await supabase
+    .from('Solicitacao_Alteracao_Perfil')
+    .update({
+      sap_status: 'recusado',
+      sap_observacao: observation || 'Recusado pelo painel administrativo.',
+      sap_reviewed_by: actorUserId,
+      sap_reviewed_at: new Date().toISOString(),
+    })
+    .eq('sap_id', request.sap_id)
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  await safeAuditLog({
+    actor_user_id: actorUserId,
+    action: 'profile_change_rejected',
+    entity_type: 'Solicitacao_Alteracao_Perfil',
+    entity_id: request.sap_id,
+    detail: observation || 'Alteração de perfil recusada.',
+    metadata: { changes: request.sap_alteracoes || {} },
+  })
 
   return data
 }
