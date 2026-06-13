@@ -43,7 +43,8 @@ const NAV_ITEMS = [
 ]
 
 const ADMIN_ITEMS = [
-  { id: 'admin', label: 'Painel do Administrador', icon: <img src={auditoriaIcon} width="20" height="20" alt="admin" />, iconWhite: <img src={auditoriaIconWHITE} width="20" height="20" alt="admin" /> },
+  { id: 'admin', label: 'Painel do Admin', icon: <img src={auditoriaIcon} width="20" height="20" alt="admin" />, iconWhite: <img src={auditoriaIconWHITE} width="20" height="20" alt="admin" /> },
+  { id: 'users', label: 'Lista de Usuário', icon: <img src={perfilIcon} width="20" height="20" alt="usuários" />, iconWhite: <img src={perfilIconWHITE} width="20" height="20" alt="usuários" /> },
 ]
 
 function NavButton({ item, currentScreen, setCurrentScreen, hoveredItem, setHoveredItem }) {
@@ -120,11 +121,19 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
         <div className="px-3 py-4 border-t border-white/5 space-y-2">
           {displayUser && (
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-text-main/30 flex items-center justify-center flex-shrink-0">
-                <span className="text-text-on-dark text-xs font-bold">
-                  {displayUser.name?.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                </span>
-              </div>
+              {displayUser.avatar || displayUser.perfil?.prf_avatar_url ? (
+                <img
+                  src={displayUser.avatar || displayUser.perfil?.prf_avatar_url}
+                  alt={displayUser.name || 'Foto do usuário'}
+                  className="w-8 h-8 rounded-full object-cover border border-white/10 bg-text-main/30 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-text-main/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-text-on-dark text-xs font-bold">
+                    {displayUser.name?.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  </span>
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-white text-xs font-semibold truncate">{displayUser.name}</p>
                 <p className="text-text-on-dark text-[10px] opacity-60 truncate">{displayUser.roleLabel || displayUser.role}</p>

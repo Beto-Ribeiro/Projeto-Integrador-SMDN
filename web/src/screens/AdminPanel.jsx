@@ -66,8 +66,8 @@ function ChangeList({ changes }) {
   )
 }
 
-export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState('requests')
+export default function AdminPanel({ initialTab = 'all' }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [requests, setRequests] = useState([])
   const [profileRequests, setProfileRequests] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -107,6 +107,10 @@ export default function AdminPanel() {
     loadAdminData()
   }, [])
 
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
+
   const stats = useMemo(() => {
     const allRequests = [...requests.map((item) => item.saw_status), ...profileRequests.map((item) => item.sap_status)]
     const pending = allRequests.filter((status) => status === 'pendente').length
@@ -115,6 +119,34 @@ export default function AdminPanel() {
 
     return { pending, approved, rejected, profiles: profiles.length, logs: logs.length }
   }, [requests, profileRequests, profiles, logs])
+
+  const allSolicitations = useMemo(() => {
+    const accessItems = requests.map((request) => ({
+      id: `access-${request.saw_id}`,
+      raw: request,
+      source: 'access',
+      type: 'Conta web',
+      requesterName: request.saw_nome,
+      requesterEmail: request.saw_email,
+      status: request.saw_status,
+      createdAt: request.saw_created_at,
+      details: `${request.saw_instituicao || 'Sem instituição'} · ${request.saw_cargo || 'Sem cargo'}`,
+    }))
+
+    const profileItems = profileRequests.map((request) => ({
+      id: `profile-${request.sap_id}`,
+      raw: request,
+      source: 'profile',
+      type: 'Alteração de perfil',
+      requesterName: request.sap_nome_solicitante,
+      requesterEmail: request.sap_email_solicitante,
+      status: request.sap_status,
+      createdAt: request.sap_created_at,
+      changes: request.sap_alteracoes,
+    }))
+
+    return [...accessItems, ...profileItems].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+  }, [requests, profileRequests])
 
   async function handleApproveAccess(request) {
     setActionLoading(request.saw_id)
@@ -189,9 +221,9 @@ export default function AdminPanel() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-2">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-bg-sidebar/70">Administração</p>
-        <h1 className="text-3xl font-bold text-slate-800">Painel do Administrador</h1>
+        <h1 className="text-3xl font-bold text-slate-800">Painel do Admin</h1>
         <p className="text-sm text-slate-500 max-w-3xl">
-          Área restrita para revisar solicitações de acesso web, alterações de perfil, perfis autorizados e registros administrativos.
+          Área restrita para revisar solicitações de acesso web, alterações de perfil e registros administrativos.
         </p>
       </div>
 
@@ -240,9 +272,9 @@ export default function AdminPanel() {
       <div className="bg-white rounded-2xl shadow-card border border-border-soft overflow-hidden">
         <div className="flex flex-wrap gap-2 border-b border-border-soft p-4">
           {[
+            ['all', 'Todas as Solicitações'],
             ['requests', 'Solicitações de Acesso'],
             ['profileChanges', 'Alterações de Perfil'],
-            ['profiles', 'Perfis Web'],
             ['logs', 'Registros'],
           ].map(([id, label]) => (
             <button
@@ -263,6 +295,50 @@ export default function AdminPanel() {
 
         {loading ? (
           <div className="p-8 text-sm text-slate-500">Carregando dados administrativos...</div>
+        ) : activeTab === 'all' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 text-left font-semibold">Tipo</th>
+                  <th className="px-5 py-3 text-left font-semibold">Solicitante</th>
+                  <th className="px-5 py-3 text-left font-semibold">Detalhes</th>
+                  <th className="px-5 py-3 text-left font-semibold">Status</th>
+                  <th className="px-5 py-3 text-left font-semibold">Criado em</th>
+                  <th className="px-5 py-3 text-right font-semibold">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-soft">
+                {allSolicitations.length === 0 && (
+                  <tr><td colSpan="6" className="px-5 py-8 text-center text-slate-400">Nenhuma solicitação encontrada.</td></tr>
+                )}
+                {allSolicitations.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/60 align-top">
+                    <td className="px-5 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{item.type}</span></td>
+                    <td className="px-5 py-4"><p className="font-semibold text-slate-700">{item.requesterName || '—'}</p><p className="text-xs text-slate-400">{item.requesterEmail || '—'}</p></td>
+                    <td className="px-5 py-4 text-slate-600">{item.source === 'profile' ? <ChangeList changes={item.changes} /> : item.details}</td>
+                    <td className="px-5 py-4"><StatusPill status={item.status} /></td>
+                    <td className="px-5 py-4 text-slate-500">{formatDate(item.createdAt)}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        {item.source === 'profile' ? (
+                          <>
+                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.sap_id} onClick={() => handleApproveProfile(item.raw)} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Aprovar</button>
+                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.sap_id} onClick={() => handleRejectProfile(item.raw)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
+                          </>
+                        ) : (
+                          <>
+                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.saw_id} onClick={() => handleApproveAccess(item.raw)} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Aprovar</button>
+                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.saw_id} onClick={() => handleRejectAccess(item.raw)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : activeTab === 'requests' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -326,34 +402,6 @@ export default function AdminPanel() {
                         <button disabled={request.sap_status !== 'pendente' || actionLoading === request.sap_id} onClick={() => handleRejectProfile(request)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
                       </div>
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : activeTab === 'profiles' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 text-left font-semibold">Nome</th>
-                  <th className="px-5 py-3 text-left font-semibold">Tipo</th>
-                  <th className="px-5 py-3 text-left font-semibold">Contato</th>
-                  <th className="px-5 py-3 text-left font-semibold">ID</th>
-                  <th className="px-5 py-3 text-left font-semibold">Criado em</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {profiles.length === 0 && (
-                  <tr><td colSpan="5" className="px-5 py-8 text-center text-slate-400">Nenhum perfil encontrado.</td></tr>
-                )}
-                {profiles.map((profile) => (
-                  <tr key={profile.prf_id} className="hover:bg-slate-50/60">
-                    <td className="px-5 py-4 font-semibold text-slate-700">{profile.prf_nome || '—'}</td>
-                    <td className="px-5 py-4 text-slate-600">{profile.prf_tipo || '—'}</td>
-                    <td className="px-5 py-4 text-slate-500"><p>{profile.prf_email_contato || '—'}</p><p className="text-xs text-slate-400">{profile.prf_telefone || 'Sem telefone'}</p></td>
-                    <td className="px-5 py-4 text-xs text-slate-400 font-mono">{profile.prf_id}</td>
-                    <td className="px-5 py-4 text-slate-500">{formatDate(profile.prf_created_at)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -27,6 +27,17 @@ export function buildProfileChanges({ currentUser, form, requestPasswordReset = 
     changes.email = { label: 'E-mail de contato', old: currentContactEmail || '—', new: nextContactEmail }
   }
 
+  const currentAvatarUrl = normalize(currentProfile.prf_avatar_url || currentUser?.avatar || '')
+  const nextAvatarUrl = normalize(form.avatarUrl || '')
+  if (nextAvatarUrl !== currentAvatarUrl) {
+    changes.avatar = {
+      label: 'Foto do perfil',
+      old: currentAvatarUrl ? 'Foto atual' : '—',
+      new: nextAvatarUrl ? 'Nova foto enviada' : '—',
+      value: nextAvatarUrl || null,
+    }
+  }
+
   if (requestPasswordReset) {
     changes.password = {
       label: 'Senha',
@@ -81,13 +92,14 @@ export async function updateOwnProfileDirect({ currentUser, form, newPassword = 
     prf_nome: normalize(form.name),
     prf_telefone: formatBrazilPhone(form.phone) || null,
     prf_email_contato: normalize(form.email).toLowerCase() || null,
+    prf_avatar_url: normalize(form.avatarUrl) || null,
   }
 
   const { data, error } = await supabase
     .from('Perfis')
     .update(payload)
     .eq('prf_id', currentUser.id)
-    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_created_at')
     .single()
 
   if (error) throw error

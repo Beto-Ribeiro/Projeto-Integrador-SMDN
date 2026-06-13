@@ -24,18 +24,15 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-bg-sidebar/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Panel */}
       <div
-        className={`relative w-full ${sizes[size]} bg-bg-surface rounded-[16px] shadow-modal animate-slide-up overflow-hidden`}
+        className={`relative w-full ${sizes[size]} max-h-[calc(100vh-2rem)] bg-bg-surface rounded-[16px] shadow-modal animate-slide-up overflow-hidden flex flex-col`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border-soft">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border-soft flex-shrink-0">
           <h2 className="text-card-title font-bold text-slate-800">{title}</h2>
           <button
             onClick={onClose}
@@ -47,8 +44,9 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-6 py-5 overflow-y-auto">
+          {children}
+        </div>
       </div>
     </div>
   )

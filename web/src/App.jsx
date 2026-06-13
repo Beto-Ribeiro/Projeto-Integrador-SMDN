@@ -7,9 +7,14 @@ import Relatorios from './screens/Relatorios.jsx'
 import Auditoria from './screens/Auditoria.jsx'
 import Perfil from './screens/Perfil.jsx'
 import AdminPanel from './screens/AdminPanel.jsx'
+import UserList from './screens/UserList.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import { useAuth } from './hooks/useAuth.js'
 import { createWebAccessRequest } from './services/webAccessService.js'
+
+function AdminHomeScreen() {
+  return <AdminPanel initialTab="all" />
+}
 
 const SCREENS = {
   dashboard: Dashboard,
@@ -18,7 +23,8 @@ const SCREENS = {
   relatorios: Relatorios,
   auditoria: Auditoria,
   perfil: Perfil,
-  admin: AdminPanel,
+  admin: AdminHomeScreen,
+  users: UserList,
 }
 
 function getDevBypassFlags() {
@@ -48,7 +54,7 @@ export default function App() {
   const canOpenAdmin = isAdmin || devBypassAdmin
 
   useEffect(() => {
-    if (currentScreen === 'admin' && !canOpenAdmin) {
+    if (['admin', 'users'].includes(currentScreen) && !canOpenAdmin) {
       setCurrentScreen('dashboard')
     }
   }, [currentScreen, canOpenAdmin])

@@ -61,7 +61,7 @@ export async function listProfileChangeRequests() {
 export async function listWebProfiles() {
   const { data, error } = await supabase
     .from('Perfis')
-    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_created_at')
     .order('prf_created_at', { ascending: false })
 
   if (error) {
@@ -138,6 +138,7 @@ function buildProfileUpdateFromChanges(changes = {}) {
   if (changes.name?.new) payload.prf_nome = changes.name.new
   if (changes.phone) payload.prf_telefone = changes.phone.new === '—' ? null : changes.phone.new
   if (changes.email?.new) payload.prf_email_contato = changes.email.new
+  if (changes.avatar) payload.prf_avatar_url = changes.avatar.value || null
 
   return payload
 }

@@ -34,7 +34,7 @@ export async function getWebAccessForUser(authUser) {
 
   const { data: perfil, error: perfilError } = await supabase
     .from('Perfis')
-    .select('prf_id, prf_nome, prf_tipo, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_created_at')
     .eq('prf_id', authUser.id)
     .maybeSingle()
 
@@ -91,7 +91,7 @@ export async function getWebAccessForUser(authUser) {
       role,
       roleLabel: getRoleLabel(role),
       isAdmin: admin,
-      avatar: null,
+      avatar: perfil?.prf_avatar_url || null,
       perfil,
       funcionario,
       administrador,
