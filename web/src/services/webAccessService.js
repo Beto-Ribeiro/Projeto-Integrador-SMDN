@@ -90,6 +90,7 @@ export async function getWebAccessForUser(authUser) {
       name,
       role,
       roleLabel: getRoleLabel(role),
+      isAdmin: admin,
       avatar: null,
       perfil,
       funcionario,

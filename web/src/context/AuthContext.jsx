@@ -21,6 +21,13 @@ export const AuthProvider = ({ children }) => {
 
     const access = await getWebAccessForUser(nextSession.user)
 
+    console.info('[SMDN Auth] Resultado da autorização web:', {
+      allowed: access?.allowed,
+      role: access?.role,
+      isAdmin: access?.isAdmin,
+      reason: access?.reason,
+    })
+
     if (!access.allowed) {
       setSession(null)
       setUser(null)
@@ -52,7 +59,7 @@ export const AuthProvider = ({ children }) => {
 
         await applySession(data?.session ?? null)
       } catch (error) {
-        console.error('Erro ao carregar sessão:', error)
+        console.error('[SMDN Auth] Erro ao carregar sessão:', error)
         if (mounted) {
           setAccessError(error.message || 'Não foi possível carregar a sessão.')
           setSession(null)
@@ -68,7 +75,23 @@ export const AuthProvider = ({ children }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      applySession(nextSession).finally(() => setLoading(false))
+      // Evita fazer consultas Supabase diretamente dentro do callback síncrono do Auth.
+      setTimeout(() => {
+        if (!mounted) return
+
+        applySession(nextSession)
+          .catch((error) => {
+            console.error('[SMDN Auth] Erro ao aplicar sessão:', error)
+            if (mounted) {
+              setAccessError(error.message || 'Não foi possível validar a sessão.')
+              setSession(null)
+              setUser(null)
+            }
+          })
+          .finally(() => {
+            if (mounted) setLoading(false)
+          })
+      }, 0)
     })
 
     return () => {
