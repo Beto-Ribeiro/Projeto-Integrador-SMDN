@@ -1,60 +1,52 @@
-# Sistema de Monitoramento de Desastres Naturais (SMDN)
+# SMDN - Pacote completo Web + Supabase Admin
 
-Monorepo contendo dois produtos:
+Este pacote contém as alterações do web e os SQLs para você aplicar manualmente no Supabase.
 
-| Produto | Pasta | Tecnologia | Deploy |
-|---|---|---|---|
-| Dashboard (agentes públicos) | `web/` | React + Vite | Vercel |
-| App comunitário | `mobile/` | Flutter | Google Play / App Store |
+## Conteúdo
 
-## Banco de dados
+```txt
+web/src/lib/supabase.js
+web/src/utils/webRoles.js
+web/src/services/authService.js
+web/src/services/webAccessService.js
+web/src/services/adminService.js
+web/src/context/AuthContext.jsx
+web/src/App.jsx
+web/src/components/Sidebar.jsx
+web/src/screens/Login.jsx
+web/src/screens/AdminPanel.jsx
+web/.env.local.example
+supabase/sql/01_fix_auth_trigger.sql
+supabase/sql/02_web_admin_tables.sql
+supabase/sql/03_create_first_admin_TEMPLATE.sql
+supabase/functions/approve-web-access-request/index.ts
+SUPABASE_PASSO_A_PASSO.md
+```
 
-Supabase — instância compartilhada entre web e mobile.
+## Aplicar no projeto
 
-## Desenvolvimento local
+Copie a pasta `web/src` por cima do seu `web/src`, ou copie arquivo por arquivo para os mesmos caminhos.
 
-### Web
+Depois:
+
 ```bash
 cd web
-npm install
-npm run dev
+npm install @supabase/supabase-js
 ```
 
-### Mobile
-```bash
-cd mobile
-flutter pub get
-flutter run
+Crie `web/.env.local` usando `web/.env.local.example` como base.
+
+## Aplicar no Supabase
+
+Siga o arquivo:
+
+```txt
+SUPABASE_PASSO_A_PASSO.md
 ```
 
-## Deploy
+## Segurança
 
-- **Web:** automático via Vercel a cada push em `main` que altere `web/**`
-- **Mobile:** build via GitHub Actions a cada push em `main` que altere `mobile/**`
-
-## Variáveis de ambiente
-
-Copie `web/.env.example` para `web/.env` e preencha:
-
-```
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
-
-## Estrutura do repositório
-
-```
-/
-├── web/               # Dashboard React + Vite (agentes públicos)
-├── mobile/            # App Flutter (comunidade)
-├── .github/
-│   └── workflows/     # CI/CD pipelines
-├── docs/              # Documentação do projeto
-├── .gitignore
-├── vercel.json        # Aponta rootDirectory para web/
-└── README.md
-```
-
-## Documentação adicional
-
-Consulte [`docs/architecture.md`](docs/architecture.md) para detalhes sobre a arquitetura do sistema.
+- O mobile não foi alterado.
+- O service_role não vai no frontend.
+- O bypass local só funciona com `import.meta.env.DEV` e `localhost`.
+- As alterações SQL precisam ser rodadas manualmente por você no Supabase.

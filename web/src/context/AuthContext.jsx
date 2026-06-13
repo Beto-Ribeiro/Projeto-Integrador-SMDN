@@ -1,16 +1,116 @@
-import { createContext, useState } from 'react'
+import { createContext, useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { signInWithEmailAndPassword, signOutFromSupabase } from '../services/authService'
+import { getWebAccessForUser } from '../services/webAccessService'
 
 export const AuthContext = createContext()
 
 export const AuthProvider = ({ children }) => {
+  const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
 
-  // TODO: Integrar com Supabase para autenticação real
+  async function applySession(nextSession, { signOutWhenUnauthorized = true } = {}) {
+    if (!nextSession?.user) {
+      setSession(null)
+      setUser(null)
+      setAccessError('')
+      return null
+    }
 
-  return (
-    <AuthContext.Provider value={{ user, setUser, isAuthenticated, setIsAuthenticated }}>
-      {children}
-    </AuthContext.Provider>
+    const access = await getWebAccessForUser(nextSession.user)
+
+    if (!access.allowed) {
+      setSession(null)
+      setUser(null)
+      setAccessError(access.reason)
+
+      if (signOutWhenUnauthorized) {
+        await supabase.auth.signOut()
+      }
+
+      return access
+    }
+
+    setSession(nextSession)
+    setUser(access.user)
+    setAccessError('')
+
+    return access
+  }
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadSession() {
+      try {
+        const { data, error } = await supabase.auth.getSession()
+
+        if (error) throw error
+        if (!mounted) return
+
+        await applySession(data?.session ?? null)
+      } catch (error) {
+        console.error('Erro ao carregar sessão:', error)
+        if (mounted) {
+          setAccessError(error.message || 'Não foi possível carregar a sessão.')
+          setSession(null)
+          setUser(null)
+        }
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    loadSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      applySession(nextSession).finally(() => setLoading(false))
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  async function signIn({ email, password }) {
+    setAccessError('')
+
+    const data = await signInWithEmailAndPassword({ email, password })
+    const access = await applySession(data.session)
+
+    if (!access?.allowed) {
+      throw new Error(access?.reason || 'Usuário sem permissão para acessar o painel web.')
+    }
+
+    return data
+  }
+
+  async function signOut() {
+    await signOutFromSupabase()
+    setSession(null)
+    setUser(null)
+    setAccessError('')
+  }
+
+  const value = useMemo(
+    () => ({
+      session,
+      user,
+      setUser,
+      loading,
+      accessError,
+      isAuthenticated: Boolean(session?.user && user),
+      isAdmin: Boolean(user?.isAdmin || user?.role === 'admin'),
+      signIn,
+      signOut,
+    }),
+    [session, user, loading, accessError]
   )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
