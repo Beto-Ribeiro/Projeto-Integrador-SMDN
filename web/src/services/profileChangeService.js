@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { formatBrazilPhone } from '../utils/phone.js'
 
 function normalize(value) {
   return String(value ?? '').trim()
@@ -14,8 +15,8 @@ export function buildProfileChanges({ currentUser, form, requestPasswordReset = 
     changes.name = { label: 'Nome completo', old: currentName || '—', new: nextName }
   }
 
-  const currentPhone = normalize(currentProfile.prf_telefone || form.currentPhone || '')
-  const nextPhone = normalize(form.phone)
+  const currentPhone = formatBrazilPhone(currentProfile.prf_telefone || form.currentPhone || '')
+  const nextPhone = formatBrazilPhone(form.phone)
   if (nextPhone !== currentPhone) {
     changes.phone = { label: 'Telefone', old: currentPhone || '—', new: nextPhone || '—' }
   }
@@ -78,7 +79,7 @@ export async function updateOwnProfileDirect({ currentUser, form, newPassword = 
 
   const payload = {
     prf_nome: normalize(form.name),
-    prf_telefone: normalize(form.phone) || null,
+    prf_telefone: formatBrazilPhone(form.phone) || null,
     prf_email_contato: normalize(form.email).toLowerCase() || null,
   }
 
