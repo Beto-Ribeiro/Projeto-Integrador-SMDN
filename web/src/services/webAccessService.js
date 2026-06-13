@@ -111,11 +111,9 @@ export async function createWebAccessRequest({ institution, name, email, role, a
     saw_status: 'pendente',
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('Solicitacao_Acesso_Web')
     .insert(payload)
-    .select('*')
-    .single()
 
   if (error) {
     if (isMissingRelationError(error)) {
@@ -127,5 +125,5 @@ export async function createWebAccessRequest({ institution, name, email, role, a
     throw error
   }
 
-  return data
+  return payload
 }
