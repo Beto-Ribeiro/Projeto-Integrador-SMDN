@@ -24,6 +24,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
     return MaterialApp(
       title: 'SMDN App',
       debugShowCheckedModeBanner: false, // Tira aquela faixa de "DEBUG" da tela

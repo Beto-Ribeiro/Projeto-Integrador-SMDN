@@ -1,4 +1,5 @@
 import 'package:branch1/telas/Relatos.dart';
+import 'package:branch1/telas/login_tela.dart';
 import 'package:flutter/material.dart';
 import 'exportador_import.dart'; // Importa a tela do mapa
 
@@ -14,7 +15,10 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   // Inicia no índice 1 para abrir o Mapa logo de cara
   bool estalogado = false;
 
-  int _currentIndex = 0;
+  int _currentIndex =
+  Supabase.instance.client.auth.currentUser == null
+      ? 5
+      : 0;
 
   void changePage(int index) {
     setState(() {
@@ -22,14 +26,11 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     });
   }
 
+  String? emailCadastro;
+  String? senhaCadastro;
+
   // Definição das 4 páginas correspondentes aos ícones
-  late final List<Widget> _telas = [
-     Home(title: "SOS", onChangePage: changePage),
-     Maps_alertas(title:"SOS", onChangePage: changePage,), // O MAPA É A SEGUNDA PÁGINA (Índice 1)
-     Relatos_tela(title: "Relato", onChangePage: changePage),
-     Scaffold(body: Center(child: Text('Página: Clima', style: TextStyle(fontSize: 24)))),
-     Cadastro_tela(title: "Cadastro", onChangePage: changePage),
-  ];
+
 
   // Os ícones na exata ordem do design
   final List<IconData> _icones = [
@@ -41,10 +42,32 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
 
   @override
   Widget build(BuildContext context) {
+
+    final List<Widget> _telas = [
+      Home(title: "SOS", onChangePage: changePage),
+      Maps_alertas(title:"SOS", onChangePage: changePage,), // O MAPA É A SEGUNDA PÁGINA (Índice 1)
+      Relatos_tela(title: "Relato", onChangePage: changePage),
+      Scaffold(body: Center(child: Text('Página: Clima', style: TextStyle(fontSize: 24)))),
+      Cadastro_tela(title: "Cadastro", onChangePage: changePage, onCadastroPendente: (email, senha){
+        print("RECEBI EMAIL NA TELA PRINCIPAL: $email");
+        print("RECEBI SENHA NA TELA PRINCIPAL: $senha");
+        setState(() {
+        emailCadastro = email;
+        senhaCadastro = senha;
+        _currentIndex = 6;
+      });},),
+      sLogCad(title: "Landing Page", onChangePage: changePage),
+      confEmail(title: "Confirmação", onChangePage: changePage, email: emailCadastro, senha: senhaCadastro,),
+      sLogin(title: "Login", onChangePage: changePage),
+    ];
+
+
+    final user = Supabase.instance.client.auth.currentUser;
+
     return Scaffold(
       extendBody: true, // Garante que o mapa passe por trás da barra transparente
       body: _telas[_currentIndex],
-      bottomNavigationBar: _currentIndex == 4
+      bottomNavigationBar: (_currentIndex == 4 || _currentIndex == 5 || _currentIndex == 6 || _currentIndex == 7)
           ? null
           :CustomAnimatedBottomBar(
         currentIndex: _currentIndex,
