@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
+import { useAuth } from '../hooks/useAuth.js'
 import { formatBrazilPhone } from '../utils/phone.js'
-import { listUsersForAdmin, updateUserProfileByAdmin } from '../services/userAdminService.js'
 import { uploadAvatarFile } from '../services/avatarService.js'
+import { formatActivityDate, formatUserActivity, listUserActivities } from '../services/profileActivityService.js'
+import {
+  DEFAULT_PERMISSIONS,
+  PERMISSION_LABELS,
+  listUsersForAdmin,
+  resetUserProfileByAdmin,
+  updateUserProfileByAdmin,
+} from '../services/userAdminService.js'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -34,6 +42,7 @@ function roleLabel(role) {
     agente: 'Agente autorizado',
     instituicao: 'Instituição',
     cidadao: 'Cidadão',
+    pendente: 'Sem perfil',
   }
 
   return labels[normalized] || role || 'Sem tipo'
@@ -46,6 +55,7 @@ function makeForm(user) {
     email: user?.prf_email_contato || '',
     phone: formatBrazilPhone(user?.prf_telefone || ''),
     avatarUrl: user?.prf_avatar_url || '',
+    permissions: { ...DEFAULT_PERMISSIONS, ...(user?.prf_permissoes || {}) },
   }
 }
 
@@ -70,12 +80,15 @@ function Avatar({ user, size = 'lg' }) {
 }
 
 export default function UserList() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedActivities, setSelectedActivities] = useState([])
   const [form, setForm] = useState(makeForm(null))
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -94,6 +107,17 @@ export default function UserList() {
     }
   }
 
+  async function loadSelectedActivities(userId) {
+    if (!userId) return
+    try {
+      const data = await listUserActivities(userId, 30)
+      setSelectedActivities(data)
+    } catch (err) {
+      console.warn('Não foi possível carregar histórico do usuário:', err.message)
+      setSelectedActivities([])
+    }
+  }
+
   useEffect(() => {
     loadUsers()
   }, [])
@@ -103,13 +127,7 @@ export default function UserList() {
     if (!search) return users
 
     return users.filter((user) => {
-      const content = [
-        user.prf_nome,
-        user.prf_tipo,
-        user.prf_email_contato,
-        user.prf_telefone,
-        user.prf_id,
-      ]
+      const content = [user.prf_nome, user.prf_tipo, user.prf_email_contato, user.prf_telefone, user.prf_id]
         .join(' ')
         .toLowerCase()
 
@@ -120,15 +138,17 @@ export default function UserList() {
   function openEdit(user) {
     setSelectedUser(user)
     setForm(makeForm(user))
+    setSelectedActivities([])
     setError('')
     setMessage('')
+    loadSelectedActivities(user.prf_id)
   }
 
   function closeEdit() {
     setSelectedUser(null)
+    setSelectedActivities([])
     setForm(makeForm(null))
   }
-
 
   async function handleAvatarFileChange(event) {
     const file = event.target.files?.[0]
@@ -148,6 +168,16 @@ export default function UserList() {
     }
   }
 
+  function togglePermission(permissionKey) {
+    setForm((current) => ({
+      ...current,
+      permissions: {
+        ...current.permissions,
+        [permissionKey]: !current.permissions?.[permissionKey],
+      },
+    }))
+  }
+
   async function handleSave() {
     if (!selectedUser) return
 
@@ -156,8 +186,9 @@ export default function UserList() {
     setMessage('')
 
     try {
-      await updateUserProfileByAdmin({ user: selectedUser, form })
+      await updateUserProfileByAdmin({ user: selectedUser, form, actorUser: currentUser })
       setMessage('Perfil do usuário atualizado. A atividade aparecerá no perfil dele.')
+      await loadSelectedActivities(selectedUser.prf_id)
       closeEdit()
       await loadUsers()
     } catch (err) {
@@ -167,27 +198,39 @@ export default function UserList() {
     }
   }
 
+  async function handleResetProfile() {
+    if (!selectedUser) return
+    const confirmed = window.confirm('Zerar o perfil deste usuário? Ele ficará sem perfil web autorizado.')
+    if (!confirmed) return
+
+    setResetting(true)
+    setError('')
+    setMessage('')
+
+    try {
+      await resetUserProfileByAdmin(selectedUser)
+      setMessage('Perfil zerado. O usuário voltou para status sem perfil autorizado.')
+      closeEdit()
+      await loadUsers()
+    } catch (err) {
+      setError(err.message || 'Não foi possível zerar o perfil do usuário.')
+    } finally {
+      setResetting(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-2">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-bg-sidebar/70">Administração</p>
         <h1 className="text-3xl font-bold text-slate-800">Lista de Usuário</h1>
         <p className="text-sm text-slate-500 max-w-3xl">
-          Consulte usuários, abra o perfil e edite dados públicos diretamente. Toda alteração feita por admin fica registrada nas atividades recentes do usuário.
+          Consulte usuários, edite perfil, permissões e histórico administrativo do usuário.
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700 leading-relaxed">
-          {error}
-        </div>
-      )}
-
-      {message && (
-        <div className="rounded-2xl border border-green-100 bg-green-50 px-5 py-4 text-sm text-green-700 leading-relaxed">
-          {message}
-        </div>
-      )}
+      {error && <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700 leading-relaxed">{error}</div>}
+      {message && <div className="rounded-2xl border border-green-100 bg-green-50 px-5 py-4 text-sm text-green-700 leading-relaxed">{message}</div>}
 
       <div className="bg-white rounded-2xl shadow-card border border-border-soft overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center gap-3 border-b border-border-soft p-4">
@@ -195,20 +238,9 @@ export default function UserList() {
             <p className="text-sm font-bold text-slate-800">Usuários cadastrados</p>
             <p className="text-xs text-slate-400">{filteredUsers.length} de {users.length} perfil(is)</p>
           </div>
-
           <div className="md:ml-auto flex gap-2 w-full md:w-auto">
-            <input
-              className="input-field md:w-72"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por nome, tipo, contato ou ID"
-            />
-            <button
-              onClick={loadUsers}
-              className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
-            >
-              Atualizar
-            </button>
+            <input className="input-field md:w-72" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, tipo, contato ou ID" />
+            <button onClick={loadUsers} className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">Atualizar</button>
           </div>
         </div>
 
@@ -219,27 +251,17 @@ export default function UserList() {
         ) : (
           <div className="divide-y divide-border-soft">
             {filteredUsers.map((user) => (
-              <button
-                key={user.prf_id}
-                onClick={() => openEdit(user)}
-                className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-all"
-              >
+              <button key={user.prf_id} onClick={() => openEdit(user)} className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-all">
                 <Avatar user={user} />
-
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-slate-800 truncate">{user.prf_nome || 'Usuário sem nome'}</p>
                   <p className="text-xs text-slate-400 truncate">{roleLabel(user.prf_tipo)}</p>
                 </div>
-
                 <div className="hidden md:block min-w-[220px] text-sm text-slate-500">
                   <p className="truncate">{user.prf_email_contato || 'Sem e-mail de contato'}</p>
                   <p className="text-xs text-slate-400">{user.prf_telefone || 'Sem telefone'}</p>
                 </div>
-
-                <div className="hidden lg:block min-w-[160px] text-xs text-slate-400">
-                  Criado em {formatDate(user.prf_created_at)}
-                </div>
-
+                <div className="hidden lg:block min-w-[160px] text-xs text-slate-400">Criado em {formatDate(user.prf_created_at)}</div>
                 <span className="text-xs font-semibold text-bg-sidebar">Editar</span>
               </button>
             ))}
@@ -247,7 +269,7 @@ export default function UserList() {
         )}
       </div>
 
-      <Modal isOpen={Boolean(selectedUser)} onClose={closeEdit} title="Editar usuário" size="md">
+      <Modal isOpen={Boolean(selectedUser)} onClose={closeEdit} title="Editar usuário" size="lg">
         <div className="space-y-4">
           {selectedUser && (
             <div className="rounded-2xl bg-slate-50 border border-border-soft p-4 flex items-center gap-3">
@@ -259,90 +281,47 @@ export default function UserList() {
             </div>
           )}
 
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800 leading-relaxed">
-            Alterações feitas aqui são aplicadas direto no perfil do usuário e aparecem em “Atividade Recente” no perfil dele.
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2"><label className="block text-label text-slate-600 mb-1.5">NOME COMPLETO</label><input className="input-field" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></div>
+            <div><label className="block text-label text-slate-600 mb-1.5">TIPO DE PERFIL</label><select className="input-field" value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}><option value="pendente">Sem perfil</option><option value="funcionario">Funcionário</option><option value="instituicao">Instituição</option><option value="cidadao">Cidadão</option><option value="administrador">Administrador</option></select></div>
+            <div><label className="block text-label text-slate-600 mb-1.5">E-MAIL DE CONTATO</label><input type="email" className="input-field" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></div>
+            <div><label className="block text-label text-slate-600 mb-1.5">TELEFONE</label><input className="input-field" inputMode="numeric" maxLength={15} value={form.phone} placeholder="(12) 98703-7110" onChange={(event) => setForm((current) => ({ ...current, phone: formatBrazilPhone(event.target.value) }))} /></div>
+            <div><label className="block text-label text-slate-600 mb-1.5">FOTO DO PERFIL</label><label className="input-field flex items-center justify-between cursor-pointer text-slate-500"><span className="truncate">{uploadingAvatar ? 'Enviando foto...' : form.avatarUrl ? 'Trocar foto' : 'Enviar foto'}</span><input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar} onChange={handleAvatarFileChange} /></label></div>
+            <div className="col-span-2"><label className="block text-label text-slate-600 mb-1.5">URL DA FOTO</label><input className="input-field" value={form.avatarUrl} placeholder="Será preenchida automaticamente após upload" onChange={(event) => setForm((current) => ({ ...current, avatarUrl: event.target.value }))} /></div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-label text-slate-600 mb-1.5">NOME COMPLETO</label>
-              <input
-                className="input-field"
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              />
+          <div className="rounded-2xl border border-border-soft p-4">
+            <h3 className="font-bold text-slate-800 mb-3">Permissões do usuário</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" checked={Boolean(form.permissions?.[key])} onChange={() => togglePermission(key)} />
+                  {label}
+                </label>
+              ))}
             </div>
+          </div>
 
-            <div>
-              <label className="block text-label text-slate-600 mb-1.5">TIPO DE PERFIL</label>
-              <select
-                className="input-field"
-                value={form.type}
-                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
-              >
-                <option value="funcionario">Funcionário</option>
-                <option value="instituicao">Instituição</option>
-                <option value="cidadao">Cidadão</option>
-                <option value="administrador">Administrador</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-label text-slate-600 mb-1.5">E-MAIL DE CONTATO</label>
-              <input
-                type="email"
-                className="input-field"
-                value={form.email}
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-label text-slate-600 mb-1.5">TELEFONE</label>
-              <input
-                className="input-field"
-                inputMode="numeric"
-                maxLength={15}
-                value={form.phone}
-                placeholder="(12) 98703-7110"
-                onChange={(event) => setForm((current) => ({ ...current, phone: formatBrazilPhone(event.target.value) }))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-label text-slate-600 mb-1.5">FOTO DO PERFIL</label>
-              <label className="input-field flex items-center justify-between cursor-pointer text-slate-500">
-                <span className="truncate">{uploadingAvatar ? 'Enviando foto...' : form.avatarUrl ? 'Trocar foto' : 'Enviar foto'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadingAvatar}
-                  onChange={handleAvatarFileChange}
-                />
-              </label>
-            </div>
-
-            <div className="col-span-2">
-              <label className="block text-label text-slate-600 mb-1.5">URL DA FOTO</label>
-              <input
-                className="input-field"
-                value={form.avatarUrl}
-                placeholder="Será preenchida automaticamente após upload"
-                onChange={(event) => setForm((current) => ({ ...current, avatarUrl: event.target.value }))}
-              />
+          <div className="rounded-2xl border border-border-soft p-4">
+            <h3 className="font-bold text-slate-800 mb-3">Histórico do perfil</h3>
+            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+              {selectedActivities.length === 0 ? <p className="text-sm text-slate-400">Nenhuma atividade registrada.</p> : selectedActivities.map((activity) => (
+                <div key={activity.atu_id} className="rounded-xl bg-slate-50 border border-border-soft px-3 py-2 text-sm text-slate-600">
+                  <p>{formatUserActivity(activity, currentUser)}</p>
+                  <p className="text-xs text-slate-400 mt-1">{formatActivityDate(activity.atu_created_at)}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="rounded-xl border border-yellow-100 bg-yellow-50 px-4 py-3 text-xs text-yellow-800 leading-relaxed">
-            Trocar senha ou e-mail de login do Auth ainda deve ser feito pelo Supabase Authentication. Esta tela altera o perfil público usado no sistema.
+            Trocar senha ou e-mail real de login ainda deve ser feito pelo Supabase Authentication.
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-border-soft">
-            <button className="btn-ghost" onClick={closeEdit} disabled={saving}>Cancelar</button>
-            <button className="btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar Alterações'}
-            </button>
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-border-soft">
+            <button className="rounded-lg px-4 py-2 text-sm font-semibold border border-red-100 text-red-600 hover:bg-red-50" onClick={handleResetProfile} disabled={saving || resetting}>{resetting ? 'Zerando...' : 'Zerar Perfil'}</button>
+            <button className="btn-ghost" onClick={closeEdit} disabled={saving || resetting}>Cancelar</button>
+            <button className="btn-primary" onClick={handleSave} disabled={saving || resetting}>{saving ? 'Salvando...' : 'Salvar Alterações'}</button>
           </div>
         </div>
       </Modal>

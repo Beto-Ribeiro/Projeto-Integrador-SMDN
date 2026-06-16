@@ -54,6 +54,27 @@ export function hasProfileChanges(changes) {
   return Object.keys(changes || {}).length > 0
 }
 
+
+function changesToActivityList(changes) {
+  return Object.entries(changes || {}).map(([key, change]) => ({
+    key,
+    label: change.label,
+    oldValue: change.old,
+    newValue: change.value ?? change.new,
+  }))
+}
+
+function isMissingRelationError(error) {
+  return error?.code === '42P01' || String(error?.message || '').toLowerCase().includes('does not exist')
+}
+
+async function safeInsertActivity(payload) {
+  const { error } = await supabase.from('Atividade_Usuario').insert(payload)
+  if (error && !isMissingRelationError(error)) {
+    console.warn('Não foi possível registrar atividade do perfil:', error.message)
+  }
+}
+
 export async function requestProfileChange({ currentUser, form, requestPasswordReset = false }) {
   if (!currentUser?.id) throw new Error('Usuário inválido para solicitar alteração.')
 
@@ -99,10 +120,28 @@ export async function updateOwnProfileDirect({ currentUser, form, newPassword = 
     .from('Perfis')
     .update(payload)
     .eq('prf_id', currentUser.id)
-    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_permissoes, prf_created_at')
     .single()
 
   if (error) throw error
+
+  const changes = buildProfileChanges({ currentUser, form })
+  const activityChanges = changesToActivityList(changes)
+
+  if (activityChanges.length > 0) {
+    await safeInsertActivity({
+      atu_user_id: currentUser.id,
+      atu_actor_id: currentUser.id,
+      atu_action: 'Perfil alterado pelo próprio usuário',
+      atu_detail: 'Usuário alterou o próprio perfil.',
+      atu_metadata: {
+        actorName: currentUser.name || currentUser.email || 'Usuário',
+        actorIsTarget: true,
+        targetName: data.prf_nome,
+        changes: activityChanges,
+      },
+    })
+  }
 
   const cleanPassword = String(newPassword || '')
   if (cleanPassword.length > 0) {

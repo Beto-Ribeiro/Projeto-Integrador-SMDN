@@ -1,6 +1,24 @@
 import { supabase } from '../lib/supabase'
 import { formatBrazilPhone } from '../utils/phone.js'
 
+export const DEFAULT_PERMISSIONS = {
+  dashboard: true,
+  reportar: true,
+  ocorrencias: true,
+  relatorios: true,
+  auditoria: false,
+  admin: false,
+}
+
+export const PERMISSION_LABELS = {
+  dashboard: 'Dashboard',
+  reportar: 'Reportar / Disparar Alertas',
+  ocorrencias: 'Gerenciar Ocorrências',
+  relatorios: 'Relatórios Analíticos',
+  auditoria: 'Auditoria',
+  admin: 'Administração de Usuários',
+}
+
 function isMissingRelationError(error) {
   return error?.code === '42P01' || String(error?.message || '').toLowerCase().includes('does not exist')
 }
@@ -14,27 +32,58 @@ async function getCurrentUserId() {
   return data?.user?.id || null
 }
 
-function buildChangeSummary(before, after) {
+async function getProfileName(userId) {
+  if (!userId) return 'Administrador'
+
+  const { data } = await supabase
+    .from('Perfis')
+    .select('prf_nome')
+    .eq('prf_id', userId)
+    .maybeSingle()
+
+  return data?.prf_nome || 'Administrador'
+}
+
+function permissionsWithDefaults(value) {
+  return { ...DEFAULT_PERMISSIONS, ...(value || {}) }
+}
+
+function makeChange(key, label, oldValue, newValue) {
+  return {
+    key,
+    label,
+    oldValue: oldValue ?? null,
+    newValue: newValue ?? null,
+  }
+}
+
+function buildChanges(before, after) {
   const changes = []
 
   if (normalize(before.prf_nome) !== normalize(after.prf_nome)) {
-    changes.push(`nome: ${before.prf_nome || '—'} → ${after.prf_nome || '—'}`)
+    changes.push(makeChange('name', 'Nome', before.prf_nome || '—', after.prf_nome || '—'))
   }
 
   if (normalize(before.prf_tipo) !== normalize(after.prf_tipo)) {
-    changes.push(`tipo: ${before.prf_tipo || '—'} → ${after.prf_tipo || '—'}`)
+    changes.push(makeChange('type', 'Tipo de perfil', before.prf_tipo || '—', after.prf_tipo || '—'))
   }
 
   if (normalize(before.prf_email_contato) !== normalize(after.prf_email_contato)) {
-    changes.push(`e-mail de contato: ${before.prf_email_contato || '—'} → ${after.prf_email_contato || '—'}`)
+    changes.push(makeChange('email', 'E-mail de contato', before.prf_email_contato || '—', after.prf_email_contato || '—'))
   }
 
   if (normalize(before.prf_telefone) !== normalize(after.prf_telefone)) {
-    changes.push(`telefone: ${before.prf_telefone || '—'} → ${after.prf_telefone || '—'}`)
+    changes.push(makeChange('phone', 'Telefone', before.prf_telefone || '—', after.prf_telefone || '—'))
   }
 
   if (normalize(before.prf_avatar_url) !== normalize(after.prf_avatar_url)) {
-    changes.push('foto de perfil atualizada')
+    changes.push(makeChange('avatar', 'Avatar', before.prf_avatar_url ? 'Foto anterior' : '—', after.prf_avatar_url ? 'Nova foto' : '—'))
+  }
+
+  const beforePermissions = JSON.stringify(permissionsWithDefaults(before.prf_permissoes))
+  const afterPermissions = JSON.stringify(permissionsWithDefaults(after.prf_permissoes))
+  if (beforePermissions !== afterPermissions) {
+    changes.push(makeChange('permissions', 'Permissões', 'Permissões anteriores', 'Permissões atualizadas'))
   }
 
   return changes
@@ -43,7 +92,7 @@ function buildChangeSummary(before, after) {
 export async function listUsersForAdmin() {
   const { data, error } = await supabase
     .from('Perfis')
-    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_permissoes, prf_created_at')
     .order('prf_nome', { ascending: true })
 
   if (error) {
@@ -56,16 +105,18 @@ export async function listUsersForAdmin() {
   return { data: data || [], missingSchema: false }
 }
 
-export async function updateUserProfileByAdmin({ user, form }) {
+export async function updateUserProfileByAdmin({ user, form, actorUser }) {
   if (!user?.prf_id) throw new Error('Usuário inválido para edição.')
 
   const actorUserId = await getCurrentUserId()
+  const actorName = actorUser?.name || await getProfileName(actorUserId)
   const payload = {
     prf_nome: normalize(form.name),
     prf_tipo: normalize(form.type) || null,
     prf_email_contato: normalize(form.email).toLowerCase() || null,
     prf_telefone: formatBrazilPhone(form.phone) || null,
     prf_avatar_url: normalize(form.avatarUrl) || null,
+    prf_permissoes: permissionsWithDefaults(form.permissions),
   }
 
   const before = {
@@ -74,28 +125,34 @@ export async function updateUserProfileByAdmin({ user, form }) {
     prf_email_contato: user.prf_email_contato,
     prf_telefone: user.prf_telefone,
     prf_avatar_url: user.prf_avatar_url,
+    prf_permissoes: permissionsWithDefaults(user.prf_permissoes),
   }
 
   const { data, error } = await supabase
     .from('Perfis')
     .update(payload)
     .eq('prf_id', user.prf_id)
-    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_permissoes, prf_created_at')
     .single()
 
   if (error) throw error
 
-  const changes = buildChangeSummary(before, data)
-  const detail = changes.length > 0
-    ? `Administrador alterou seu perfil: ${changes.join('; ')}.`
-    : 'Administrador salvou seu perfil sem alterações visíveis.'
+  const changes = buildChanges(before, data)
+  const detail = actorUserId === user.prf_id
+    ? 'Usuário alterou o próprio perfil.'
+    : `${actorName} alterou o perfil de ${data.prf_nome || user.prf_id}.`
 
   const activityPayload = {
     atu_user_id: user.prf_id,
     atu_actor_id: actorUserId,
-    atu_action: 'Perfil atualizado pelo administrador',
+    atu_action: actorUserId === user.prf_id ? 'Perfil alterado pelo próprio usuário' : 'Perfil alterado pelo administrador',
     atu_detail: detail,
-    atu_metadata: { before, after: data, changes },
+    atu_metadata: {
+      actorName,
+      actorIsTarget: actorUserId === user.prf_id,
+      targetName: data.prf_nome,
+      changes,
+    },
   }
 
   const { error: activityError } = await supabase
@@ -114,7 +171,7 @@ export async function updateUserProfileByAdmin({ user, form }) {
       entity_type: 'Perfis',
       entity_id: user.prf_id,
       detail,
-      metadata: { before, after: data, changes },
+      metadata: { actorName, before, after: data, changes },
     })
 
   if (auditError && !isMissingRelationError(auditError)) {
@@ -122,4 +179,16 @@ export async function updateUserProfileByAdmin({ user, form }) {
   }
 
   return data
+}
+
+export async function resetUserProfileByAdmin(user) {
+  if (!user?.prf_id) throw new Error('Usuário inválido para zerar perfil.')
+
+  const { error } = await supabase.rpc('admin_reset_user_profile', {
+    target_user_id: user.prf_id,
+  })
+
+  if (error) throw error
+
+  return true
 }

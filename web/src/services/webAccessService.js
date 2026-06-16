@@ -34,7 +34,7 @@ export async function getWebAccessForUser(authUser) {
 
   const { data: perfil, error: perfilError } = await supabase
     .from('Perfis')
-    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_created_at')
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_permissoes, prf_created_at')
     .eq('prf_id', authUser.id)
     .maybeSingle()
 
@@ -92,6 +92,7 @@ export async function getWebAccessForUser(authUser) {
       roleLabel: getRoleLabel(role),
       isAdmin: admin,
       avatar: perfil?.prf_avatar_url || null,
+      permissions: perfil?.prf_permissoes || {},
       perfil,
       funcionario,
       administrador,
@@ -111,9 +112,11 @@ export async function createWebAccessRequest({ institution, name, email, role, a
     saw_status: 'pendente',
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('Solicitacao_Acesso_Web')
     .insert(payload)
+    .select('*')
+    .single()
 
   if (error) {
     if (isMissingRelationError(error)) {
@@ -125,5 +128,5 @@ export async function createWebAccessRequest({ institution, name, email, role, a
     throw error
   }
 
-  return payload
+  return data
 }

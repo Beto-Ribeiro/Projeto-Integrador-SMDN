@@ -6,7 +6,7 @@ import mailIcon from '../assets/perfil/mail.svg'
 import phoneIcon from '../assets/perfil/phone.svg'
 import { useAuth } from '../hooks/useAuth.js'
 import { formatBrazilPhone } from '../utils/phone.js'
-import { formatActivityDate, listUserActivities } from '../services/profileActivityService.js'
+import { formatActivityDate, formatUserActivity, listUserActivities } from '../services/profileActivityService.js'
 import { uploadAvatarFile } from '../services/avatarService.js'
 import {
   buildProfileChanges,
@@ -71,7 +71,7 @@ function ProfileInfoIcon({ src, alt }) {
   )
 }
 
-function ActivityList({ activities }) {
+function ActivityList({ activities, currentUser }) {
   const items = activities.length > 0 ? activities : FALLBACK_ACTIVITY
 
   return (
@@ -79,7 +79,7 @@ function ActivityList({ activities }) {
       {items.map((activity, index) => {
         const isDatabaseActivity = Boolean(activity.atu_id)
         const action = isDatabaseActivity ? activity.atu_action : activity.action
-        const target = isDatabaseActivity ? activity.atu_detail : activity.target
+        const target = isDatabaseActivity ? formatUserActivity(activity, currentUser) : activity.target
         const at = isDatabaseActivity ? formatActivityDate(activity.atu_created_at) : activity.at
 
         return (
@@ -138,11 +138,13 @@ export default function Perfil() {
   })
 
   const permissions = useMemo(() => {
-    if (isAdmin) return PERMISSIONS
-    return PERMISSIONS.map((permission) =>
-      permission.key === 'admin' ? { ...permission, granted: false } : permission
-    )
-  }, [isAdmin])
+    const storedPermissions = user?.permissions || user?.perfil?.prf_permissoes || {}
+
+    return PERMISSIONS.map((permission) => ({
+      ...permission,
+      granted: isAdmin ? true : Boolean(storedPermissions[permission.key]),
+    }))
+  }, [isAdmin, user?.permissions, user?.perfil?.prf_permissoes])
 
 
   async function handleAvatarFileChange(event) {
@@ -289,7 +291,7 @@ export default function Perfil() {
 
           <Card className="flex-1">
             <h3 className="text-card-title font-bold text-slate-800 mb-4">Atividade Recente</h3>
-            <ActivityList activities={activities} />
+            <ActivityList activities={activities} currentUser={user} />
           </Card>
         </div>
       </div>
