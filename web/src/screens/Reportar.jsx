@@ -1,69 +1,37 @@
-import { useState, useRef, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
 import MapView from '../components/MapView'
+import { useAuth } from '../hooks/useAuth.js'
+import {
+  countAlertsToday,
+  countRecipients,
+  dispatchAlert,
+  listAlerts,
+  subscribeReportarData,
+} from '../services/alertService.js'
 
 const ALERT_TYPES = ['Enchente', 'Deslizamento', 'Temporal', 'Tornado']
 const SEVERITIES = ['critical', 'severe', 'regular']
 
-const MOCK_ALERTS = [
-  {
-    id: 1,
-    type: 'Enchente',
-    description: 'Transbordamento do Rio Paraíba do Sul afetando bairros ribeirinhos.',
-    city: 'São José dos Campos',
-    severity: 'critical',
-    sentAt: '2025-01-10T08:20:00',
-    recipients: 3200,
-    operator: 'Carlos Mendes',
-  },
-  {
-    id: 2,
-    type: 'Deslizamento',
-    description: 'Risco de deslizamento na Serra da Mantiqueira após chuvas fortes.',
-    city: 'Caraguatatuba',
-    severity: 'severe',
-    sentAt: '2025-01-10T07:40:00',
-    recipients: 1100,
-    operator: 'Ana Souza',
-  },
-  {
-    id: 3,
-    type: 'Temporal',
-    description: 'Previsão de granizo e ventos fortes para as próximas 3 horas.',
-    city: 'Taubaté',
-    severity: 'regular',
-    sentAt: '2025-01-10T06:55:00',
-    recipients: 820,
-    operator: 'Carlos Mendes',
-  },
-  {
-    id: 4,
-    type: 'Enchente',
-    description: 'Alagamento em vias do centro após enxurrada.',
-    city: 'Pindamonhangaba',
-    severity: 'severe',
-    sentAt: '2025-01-09T18:30:00',
-    recipients: 980,
-    operator: 'Ana Souza',
-  },
-]
-
 const SEVERITY_MAP = {
   critical: { label: 'Crítico', cls: 'badge-critical' },
-  severe:   { label: 'Grave',   cls: 'badge-severe'   },
-  regular:  { label: 'Moderado',cls: 'badge-regular'  },
+  severe: { label: 'Grave', cls: 'badge-severe' },
+  regular: { label: 'Moderado', cls: 'badge-regular' },
 }
 
 function formatDate(iso) {
+  if (!iso) return '—'
   const d = new Date(iso)
   return d.toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
-// ── Autocomplete hook ────────────────────────────────────────────────────────
 function useCityAutocomplete(query) {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -83,13 +51,11 @@ function useCityAutocomplete(query) {
         const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
         const data = await res.json()
 
-        // Filtra apenas municípios/cidades, deduplicando pelo nome normalizado
         const seen = new Set()
         const cities = []
         for (const item of data) {
           const addr = item.address || {}
-          const cityName =
-            addr.city || addr.town || addr.municipality || addr.village || ''
+          const cityName = addr.city || addr.town || addr.municipality || addr.village || ''
           const state = addr.state || ''
           if (!cityName) continue
           const key = `${cityName.toLowerCase()}|${state.toLowerCase()}`
@@ -117,7 +83,6 @@ function useCityAutocomplete(query) {
   return { suggestions, loading, clear: () => setSuggestions([]) }
 }
 
-// ── Neighborhood autocomplete hook ──────────────────────────────────────────
 function useNeighborhoodAutocomplete(query, cityName) {
   const [suggestions, setSuggestions] = useState([])
   const debounceRef = useRef(null)
@@ -140,8 +105,7 @@ function useNeighborhoodAutocomplete(query, cityName) {
         const results = []
         for (const item of data) {
           const addr = item.address || {}
-          const neighborhood =
-            addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || ''
+          const neighborhood = addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || ''
           if (!neighborhood) continue
           const key = neighborhood.toLowerCase()
           if (seen.has(key)) continue
@@ -166,34 +130,106 @@ function useNeighborhoodAutocomplete(query, cityName) {
   return { suggestions, clear: () => setSuggestions([]) }
 }
 
+function AlertDetails({ alert }) {
+  if (!alert) return null
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border-soft bg-slate-50 p-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-lg font-bold text-slate-800">{alert.type}</h3>
+          <span className={SEVERITY_MAP[alert.severity]?.cls}>{SEVERITY_MAP[alert.severity]?.label || alert.severity}</span>
+        </div>
+        <p className="text-sm text-slate-500 mt-1">
+          {alert.city}{alert.neighborhood ? ` · ${alert.neighborhood}` : ''}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-label text-slate-500 mb-1">DESCRIÇÃO</p>
+        <p className="text-sm text-slate-700 leading-relaxed">{alert.description}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="rounded-xl bg-slate-50 border border-border-soft p-3">
+          <p className="text-xs text-slate-400 font-bold uppercase">Operador</p>
+          <p className="text-slate-700 font-semibold mt-1">{alert.operator}</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 border border-border-soft p-3">
+          <p className="text-xs text-slate-400 font-bold uppercase">Data e hora</p>
+          <p className="text-slate-700 font-semibold mt-1">{formatDate(alert.sentAt)}</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 border border-border-soft p-3">
+          <p className="text-xs text-slate-400 font-bold uppercase">Destinatários</p>
+          <p className="text-slate-700 font-semibold mt-1">{alert.recipients.toLocaleString('pt-BR')}</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 border border-border-soft p-3">
+          <p className="text-xs text-slate-400 font-bold uppercase">Status</p>
+          <p className="text-slate-700 font-semibold mt-1">{alert.status || 'disparado'}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Reportar() {
-  const [alerts] = useState(MOCK_ALERTS)
+  const { user } = useAuth()
+  const [alerts, setAlerts] = useState([])
+  const [alertsToday, setAlertsToday] = useState(0)
+  const [recipients, setRecipients] = useState(0)
   const [filterSeverity, setFilterSeverity] = useState('')
   const [filterCity, setFilterCity] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterOperator, setFilterOperator] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [form, setForm] = useState({ type: '', city: '', severity: 'critical', description: '', neighborhood: '' })
-  const [successMsg, setSuccessMsg] = useState(false)
+  const [selectedAlert, setSelectedAlert] = useState(null)
+  const [form, setForm] = useState({ type: '', city: '', severity: 'critical', description: '', neighborhood: '', lat: null, lng: null })
+  const [successMsg, setSuccessMsg] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [dispatching, setDispatching] = useState(false)
   const [isMapOpen, setIsMapOpen] = useState(false)
   const [autoFilled, setAutoFilled] = useState(false)
 
-  // Autocomplete state
   const [cityInputValue, setCityInputValue] = useState('')
   const [neighborhoodInputValue, setNeighborhoodInputValue] = useState('')
   const [showCitySuggestions, setShowCitySuggestions] = useState(false)
   const [showNeighborhoodSuggestions, setShowNeighborhoodSuggestions] = useState(false)
   const cityWrapperRef = useRef(null)
   const neighborhoodWrapperRef = useRef(null)
-  const mapRef = useRef(null)
+  const [targetLocation, setTargetLocation] = useState(null)
 
   const { suggestions: citySuggestions, loading: cityLoading, clear: clearCitySuggestions } = useCityAutocomplete(cityInputValue)
   const { suggestions: neighborhoodSuggestions, clear: clearNeighborhoodSuggestions } = useNeighborhoodAutocomplete(neighborhoodInputValue, form.city)
 
-  // targetLocation passado ao MapView — agora inclui lat/lon para voar sem re-geocodificar
-  const [targetLocation, setTargetLocation] = useState(null)
+  const loadReportarData = useCallback(async () => {
+    setError('')
+    try {
+      const [alertsResult, todayResult, recipientsResult] = await Promise.all([
+        listAlerts({ severity: filterSeverity, city: filterCity, operator: filterOperator, date: filterDate }),
+        countAlertsToday(),
+        countRecipients(),
+      ])
+      setAlerts(alertsResult)
+      setAlertsToday(todayResult)
+      setRecipients(recipientsResult)
+    } catch (err) {
+      setError(err.message || 'Não foi possível carregar alertas.')
+    } finally {
+      setLoading(false)
+    }
+  }, [filterSeverity, filterCity, filterOperator, filterDate])
 
-  // Fechar dropdowns ao clicar fora
+  useEffect(() => {
+    loadReportarData()
+  }, [loadReportarData])
+
+  useEffect(() => {
+    return subscribeReportarData(() => {
+      loadReportarData()
+    })
+  }, [loadReportarData])
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (cityWrapperRef.current && !cityWrapperRef.current.contains(e.target)) {
@@ -207,72 +243,71 @@ export default function Reportar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const clearFilters = () => {
-    setFilterSeverity('')
-    setFilterCity('')
-    setFilterDate('')
-    setFilterOperator('')
-  }
-
-  const handleDispatch = () => {
-    setIsModalOpen(false)
-    setSuccessMsg(true)
-    setForm({ type: '', city: '', severity: 'critical', description: '', neighborhood: '' })
+  function resetForm() {
+    setForm({ type: '', city: '', severity: 'critical', description: '', neighborhood: '', lat: null, lng: null })
     setCityInputValue('')
     setNeighborhoodInputValue('')
     setTargetLocation(null)
-    setTimeout(() => setSuccessMsg(false), 4000)
+    setAutoFilled(false)
   }
 
-  // Mapa clicado: preenche cidade + bairro via reverse geocode, mas NÃO fecha o mapa
-  const handleMapClick = async (lat, lng) => {
+  async function handleDispatch() {
+    if (!form.type || !form.city || !form.description) {
+      setError('Preencha tipo, município e descrição para disparar o alerta.')
+      return
+    }
+
+    setDispatching(true)
+    setError('')
+
+    try {
+      await dispatchAlert({ form, currentUser: user, recipients })
+      setIsModalOpen(false)
+      setSuccessMsg('Alerta disparado com sucesso!')
+      resetForm()
+      await loadReportarData()
+      setTimeout(() => setSuccessMsg(''), 4000)
+    } catch (err) {
+      setError(err.message || 'Não foi possível disparar o alerta.')
+    } finally {
+      setDispatching(false)
+    }
+  }
+
+  async function handleMapClick(lat, lng) {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
         { headers: { 'Accept-Language': 'pt-BR' } }
       )
       const data = await response.json()
+      const city = data.address?.city || data.address?.town || data.address?.municipality || data.address?.village || ''
+      const neighborhood = data.address?.suburb || data.address?.neighbourhood || data.address?.quarter || ''
 
-      const city =
-        data.address?.city ||
-        data.address?.town ||
-        data.address?.municipality ||
-        data.address?.village ||
-        ''
-
-      const neighborhood =
-        data.address?.suburb ||
-        data.address?.neighbourhood ||
-        data.address?.quarter ||
-        ''
-
-      setForm((prev) => ({ ...prev, city, neighborhood }))
+      setForm((prev) => ({ ...prev, city, neighborhood, lat, lng }))
       setCityInputValue(city)
       setNeighborhoodInputValue(neighborhood)
       setAutoFilled(true)
-      // NÃO fecha o mapa — usuário sai manualmente
-    } catch (error) {
-      console.error('Erro ao localizar endereço:', error)
+    } catch (err) {
+      console.error('Erro ao localizar endereço:', err)
     }
   }
 
-  const handleCitySelect = (suggestion) => {
-    setForm((f) => ({ ...f, city: suggestion.city }))
+  function handleCitySelect(suggestion) {
+    setForm((f) => ({ ...f, city: suggestion.city, lat: suggestion.lat, lng: suggestion.lon }))
     setCityInputValue(suggestion.displayName)
     setAutoFilled(false)
     clearCitySuggestions()
     setShowCitySuggestions(false)
-    // Atualiza o mapa se estiver aberto
     setTargetLocation({ city: suggestion.city, lat: suggestion.lat, lon: suggestion.lon })
   }
 
-  const handleNeighborhoodSelect = (suggestion) => {
-    setForm((f) => ({ ...f, neighborhood: suggestion.neighborhood }))
+  function handleNeighborhoodSelect(suggestion) {
+    setForm((f) => ({ ...f, neighborhood: suggestion.neighborhood, lat: suggestion.lat, lng: suggestion.lon }))
     setNeighborhoodInputValue(suggestion.displayName)
     setAutoFilled(false)
     clearNeighborhoodSuggestions()
     setShowNeighborhoodSuggestions(false)
-    // Passa boundingbox para o mapa desenhar o anel ao redor do bairro
     setTargetLocation({
       city: form.city,
       neighborhood: suggestion.neighborhood,
@@ -282,150 +317,106 @@ export default function Reportar() {
     })
   }
 
-  const filteredAlerts = alerts.filter((alert) => {
-    const matchesSeverity = !filterSeverity || alert.severity === filterSeverity
-    const matchesCity     = !filterCity     || alert.city.toLowerCase().includes(filterCity.toLowerCase())
-    const matchesOperator = !filterOperator || alert.operator.toLowerCase().includes(filterOperator.toLowerCase())
-    const matchesDate     = !filterDate     || alert.sentAt.slice(0, 10) === filterDate
-    return matchesSeverity && matchesCity && matchesOperator && matchesDate
-  })
-
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
+    <div className="p-6 h-full min-h-0 overflow-hidden flex flex-col gap-4 animate-fade-in">
+      <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 flex-1 min-w-[560px]">
+          <select className="select-field min-w-0" value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)}>
+            <option value="">Todas as severidades</option>
+            <option value="critical">Crítico</option>
+            <option value="severe">Grave</option>
+            <option value="regular">Moderado</option>
+          </select>
 
-      {/* Header + Stats row */}
-      <div className="flex items-center justify-between gap-6">
-        <div className="shrink-0" />
-
-        <div className="px-6 py-4 border-b border-border-soft">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <select
-              className="select-field"
-              value={filterSeverity}
-              onChange={(e) => setFilterSeverity(e.target.value)}
-            >
-              <option value="">Todas Severidades</option>
-              <option value="critical">Crítico</option>
-              <option value="severe">Grave</option>
-              <option value="regular">Moderado</option>
-            </select>
-
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Pesquisar cidade..."
-              value={filterCity}
-              onChange={(e) => setFilterCity(e.target.value)}
-            />
-
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Pesquisar operador..."
-              value={filterOperator}
-              onChange={(e) => setFilterOperator(e.target.value)}
-            />
-
-            <button
-              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg px-2 py-2 transition-colors"
-              onClick={clearFilters}
-            >
-              Limpar filtros
-            </button>
-          </div>
+          <input className="input-field min-w-0" placeholder="Pesquisar cidade..." value={filterCity} onChange={(e) => setFilterCity(e.target.value)} />
+          <input className="input-field min-w-0" placeholder="Pesquisar operador..." value={filterOperator} onChange={(e) => setFilterOperator(e.target.value)} />
+          <input className="input-field min-w-0" type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
         </div>
 
-        {/* Stats inline */}
-        <div className="flex items-center gap-4 flex-1 justify-end">
-          <Card className="text-center py-3 px-5">
-            <p className="text-label text-slate-500 mb-1">ALERTAS HOJE</p>
-            <p className="text-3xl font-bold text-text-main">3</p>
-          </Card>
-          <Card className="text-center py-3 px-5">
-            <p className="text-label text-slate-500 mb-1">TOTAL DESTINATÁRIOS</p>
-            <p className="text-3xl font-bold text-status-severe">5.550</p>
-          </Card>
+        <Card className="text-center py-3 px-5 min-w-[120px]">
+          <p className="text-label text-slate-500 mb-1">ALERTAS HOJE</p>
+          <p className="text-3xl font-bold text-text-main">{alertsToday}</p>
+        </Card>
 
-          {/* Big bell button */}
-          <button
-            className="flex flex-col items-center justify-center gap-1 bg-red-500 hover:bg-red-600 active:scale-95 transition-all rounded-2xl w-24 h-24 shadow-lg text-white shrink-0"
-            onClick={() => setIsModalOpen(true)}
-          >
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-xs font-bold leading-tight text-center">Disparar<br />Alerta</span>
-          </button>
-        </div>
+        <Card className="text-center py-3 px-5 min-w-[160px]">
+          <p className="text-label text-slate-500 mb-1">TOTAL DESTINATÁRIOS</p>
+          <p className="text-3xl font-bold text-status-severe">{recipients.toLocaleString('pt-BR')}</p>
+        </Card>
+
+        <button
+          className="flex flex-col items-center justify-center gap-1 bg-red-500 hover:bg-red-600 active:scale-95 transition-all rounded-2xl w-24 h-24 shadow-lg text-white shrink-0"
+          onClick={() => setIsModalOpen(true)}
+        >
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-xs font-bold leading-tight text-center">Disparar<br />Alerta</span>
+        </button>
       </div>
 
-      {/* Success toast */}
       {successMsg && (
-        <div className="flex items-center gap-3 bg-status-success-bg border border-status-success/30 text-status-success font-semibold text-sm px-4 py-3 rounded-lg animate-slide-up">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="7" fill="currentColor" opacity=".15" />
-            <path d="M5.5 9l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Alerta disparado com sucesso!
+        <div className="flex-shrink-0 flex items-center gap-3 bg-status-success-bg border border-status-success/30 text-status-success font-semibold text-sm px-4 py-3 rounded-lg animate-slide-up">
+          {successMsg}
         </div>
       )}
 
-      {/* History */}
-      <Card className="p-0 overflow-hidden">
-        <div className="px-6 py-4 border-b border-border-soft flex items-center justify-between">
+      {error && (
+        <div className="flex-shrink-0 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <Card className="p-0 overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="px-6 py-4 border-b border-border-soft flex items-center justify-between flex-shrink-0">
           <h3 className="text-card-title font-bold text-slate-800">Histórico de Alertas</h3>
+          {loading && <span className="text-xs text-slate-400">Carregando...</span>}
         </div>
 
-        <div className="divide-y divide-border-soft">
-          {filteredAlerts.map((alert) => (
-            <div key={alert.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
+        <div className="divide-y divide-border-soft overflow-y-auto flex-1 min-h-0">
+          {!loading && alerts.length === 0 && (
+            <div className="px-6 py-10 text-center text-sm text-slate-400">Nenhum alerta encontrado.</div>
+          )}
+
+          {alerts.map((alert) => (
+            <button
+              key={alert.id}
+              onClick={() => setSelectedAlert(alert)}
+              className="w-full text-left px-6 py-4 hover:bg-slate-50 transition-colors"
+            >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-bold text-slate-800">{alert.type}</span>
-                    <span className={SEVERITY_MAP[alert.severity].cls}>{SEVERITY_MAP[alert.severity].label}</span>
-                    <span className="text-xs text-slate-400">• {alert.city}</span>
+                    <span className={SEVERITY_MAP[alert.severity]?.cls}>{SEVERITY_MAP[alert.severity]?.label || alert.severity}</span>
+                    <span className="text-xs text-slate-400">• {alert.city}{alert.neighborhood ? ` · ${alert.neighborhood}` : ''}</span>
                   </div>
-                  <p className="text-sm text-slate-600 mb-2">{alert.description}</p>
-                  <div className="flex items-center gap-4 text-xs text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M5 1.5V4M11 1.5V4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M2 7h12" stroke="currentColor" strokeWidth="1.4" /></svg>
-                      {formatDate(alert.sentAt)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4" /><path d="M2 13.5c0-2.485 2.686-4.5 6-4.5s6 2.015 6 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-                      {alert.operator}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="4" y="1" width="8" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M7 12.5h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-                      {alert.recipients.toLocaleString('pt-BR')} destinatários
-                    </span>
+
+                  <p className="text-sm text-slate-600 mb-2 line-clamp-2">{alert.description}</p>
+
+                  <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
+                    <span>{formatDate(alert.sentAt)}</span>
+                    <span>{alert.operator}</span>
+                    <span>{alert.recipients.toLocaleString('pt-BR')} destinatários</span>
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </Card>
 
-      {/* Dispatch Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Disparar Novo Alerta" size="md">
         <div className="space-y-4">
           <div>
             <label className="block text-label text-slate-600 mb-1.5">TIPO DE OCORRÊNCIA</label>
-            <select
-              className="select-field"
-              value={form.type}
-              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-            >
+            <select className="select-field" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
               <option value="">Selecione o tipo...</option>
               {ALERT_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* City with autocomplete */}
             <div ref={cityWrapperRef} className="relative">
               <label className="block text-label text-slate-600 mb-1.5">MUNICÍPIO</label>
               <div className="relative">
@@ -442,26 +433,12 @@ export default function Reportar() {
                   onFocus={() => cityInputValue.length >= 2 && setShowCitySuggestions(true)}
                   autoComplete="off"
                 />
-                {cityLoading && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
-                    <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
-                    </svg>
-                  </span>
-                )}
+                {cityLoading && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">...</span>}
               </div>
               {showCitySuggestions && citySuggestions.length > 0 && (
                 <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
                   {citySuggestions.map((s, i) => (
-                    <li
-                      key={i}
-                      className="px-3 py-2 text-sm text-slate-700 hover:bg-[#597891]/10 cursor-pointer flex items-center gap-2 transition-colors"
-                      onMouseDown={() => handleCitySelect(s)}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[#597891]">
-                        <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.485-2.015-4.5-4.5-4.5Z" stroke="currentColor" strokeWidth="1.4"/>
-                        <circle cx="8" cy="6" r="1.5" fill="currentColor"/>
-                      </svg>
+                    <li key={i} className="px-3 py-2 text-sm text-slate-700 hover:bg-[#597891]/10 cursor-pointer" onMouseDown={() => handleCitySelect(s)}>
                       {s.displayName}
                     </li>
                   ))}
@@ -471,19 +448,12 @@ export default function Reportar() {
 
             <div>
               <label className="block text-label text-slate-600 mb-1.5">SEVERIDADE</label>
-              <select
-                className="select-field"
-                value={form.severity}
-                onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value }))}
-              >
-                {SEVERITIES.map((s) => (
-                  <option key={s} value={s}>{SEVERITY_MAP[s].label}</option>
-                ))}
+              <select className="select-field" value={form.severity} onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value }))}>
+                {SEVERITIES.map((s) => <option key={s} value={s}>{SEVERITY_MAP[s].label}</option>)}
               </select>
             </div>
           </div>
 
-          {/* Neighborhood with autocomplete */}
           <div ref={neighborhoodWrapperRef} className="relative">
             <label className="block text-label text-slate-600 mb-1.5">BAIRRO / ÁREA (opcional)</label>
             <input
@@ -502,15 +472,7 @@ export default function Reportar() {
             {showNeighborhoodSuggestions && neighborhoodSuggestions.length > 0 && (
               <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
                 {neighborhoodSuggestions.map((s, i) => (
-                  <li
-                    key={i}
-                    className="px-3 py-2 text-sm text-slate-700 hover:bg-[#597891]/10 cursor-pointer flex items-center gap-2 transition-colors"
-                    onMouseDown={() => handleNeighborhoodSelect(s)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[#597891]">
-                      <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4"/>
-                      <path d="M5 8h6M8 5v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                    </svg>
+                  <li key={i} className="px-3 py-2 text-sm text-slate-700 hover:bg-[#597891]/10 cursor-pointer" onMouseDown={() => handleNeighborhoodSelect(s)}>
                     {s.displayName}
                   </li>
                 ))}
@@ -518,51 +480,34 @@ export default function Reportar() {
             )}
           </div>
 
-          <button
-            className="w-full py-3 bg-[#597891] hover:bg-[#2D5A87] text-white font-semibold rounded-lg transition-colors"
-            onClick={() => setIsMapOpen(true)}
-          >
+          <button className="w-full py-3 bg-[#597891] hover:bg-[#2D5A87] text-white font-semibold rounded-lg transition-colors" onClick={() => setIsMapOpen(true)}>
             Localizar Área no Mapa
           </button>
 
-          {/* Modal do mapa — NÃO fecha ao clicar, só fecha via onClose */}
-          <Modal
-            isOpen={isMapOpen}
-            onClose={() => setIsMapOpen(false)}
-            title="Localizar Área"
-            size="xl"
-          >
-            <div className="h-[500px] rounded-lg overflow-hidden">
-              <MapView
-                ref={mapRef}
-                onMapClick={handleMapClick}
-                targetLocation={targetLocation}
-              />
+          <Modal isOpen={isMapOpen} onClose={() => setIsMapOpen(false)} title="Selecionar Área no Mapa" size="xl">
+            <div className="h-[65vh] rounded-xl overflow-hidden border border-border-soft">
+              <MapView onMapClick={handleMapClick} targetLocation={targetLocation} />
             </div>
+            <p className="text-xs text-slate-500 mt-3">Clique no mapa para preencher município e bairro aproximados.</p>
           </Modal>
 
           <div>
-            <label className="block text-label text-slate-600 mb-1.5">MENSAGEM DO ALERTA</label>
-            <textarea
-              className="input-field resize-none"
-              rows={3}
-              placeholder="Descreva a situação e orientações para os cidadãos..."
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            />
+            <label className="block text-label text-slate-600 mb-1.5">DESCRIÇÃO</label>
+            <textarea className="input-field min-h-[110px] resize-none" placeholder="Descreva a situação..." value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-border-soft">
-            <button className="btn-ghost" onClick={() => setIsModalOpen(false)}>Cancelar</button>
-            <button
-              className="btn-primary"
-              onClick={handleDispatch}
-              disabled={!form.type || !form.city}
-            >
-              Confirmar Disparo
-            </button>
+          <div className="rounded-xl bg-slate-50 border border-border-soft px-4 py-3 text-sm text-slate-600">
+            Este alerta será registrado para <strong>{recipients.toLocaleString('pt-BR')}</strong> destinatário(s). As notificações mobile serão ligadas depois.
           </div>
+
+          <button className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-all disabled:opacity-50" onClick={handleDispatch} disabled={dispatching}>
+            {dispatching ? 'Disparando...' : 'Confirmar Disparo'}
+          </button>
         </div>
+      </Modal>
+
+      <Modal isOpen={Boolean(selectedAlert)} onClose={() => setSelectedAlert(null)} title="Detalhes do Alerta" size="lg">
+        <AlertDetails alert={selectedAlert} />
       </Modal>
     </div>
   )
