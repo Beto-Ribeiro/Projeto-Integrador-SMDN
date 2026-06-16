@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import dashboardIcon from '../assets/menu/ativo/map-pin.svg'
 import dashboardIconWHITE from '../assets/menu/hover/map-pin.svg'
@@ -14,7 +14,6 @@ import perfilIcon from '../assets/menu/ativo/user.svg'
 import perfilIconWHITE from '../assets/menu/hover/user.svg'
 import logoutIcon from '../assets/menu/ativo/log-out.svg'
 import logoutIconWHITE from '../assets/menu/hover/log-out.svg'
-
 
 function getLocalDevBypass() {
   const isLocalhost =
@@ -47,6 +46,39 @@ const ADMIN_ITEMS = [
   { id: 'users', label: 'Lista de Usuário', icon: <img src={perfilIcon} width="20" height="20" alt="usuários" />, iconWhite: <img src={perfilIconWHITE} width="20" height="20" alt="usuários" /> },
 ]
 
+function getInitials(name) {
+  return String(name || '')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+function UserAvatar({ user, size = 'sm' }) {
+  const avatarUrl = user?.avatar || user?.perfil?.prf_avatar_url
+  const sizeClass = size === 'lg' ? 'w-16 h-16 text-xl' : 'w-8 h-8 text-xs'
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={user?.name || 'Foto do usuário'}
+        className={`${sizeClass} rounded-full object-cover border border-white/10 bg-text-main/30 flex-shrink-0`}
+      />
+    )
+  }
+
+  return (
+    <div className={`${sizeClass} rounded-full bg-text-main/30 flex items-center justify-center flex-shrink-0`}>
+      <span className="text-text-on-dark font-bold">
+        {getInitials(user?.name)}
+      </span>
+    </div>
+  )
+}
+
 function NavButton({ item, currentScreen, setCurrentScreen, hoveredItem, setHoveredItem }) {
   const active = currentScreen === item.id
 
@@ -71,15 +103,47 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
   const { user, isAdmin } = useAuth()
   const { devBypassAuth, devBypassAdmin } = getLocalDevBypass()
   const showAdmin = isAdmin || devBypassAdmin
-  const displayUser = user || (devBypassAuth ? { name: 'Dev Local', roleLabel: devBypassAdmin ? 'Administrador local' : 'Bypass local' } : null)
+
+  const displayUser =
+    user ||
+    (devBypassAuth
+      ? {
+          name: 'Dev Local',
+          roleLabel: devBypassAdmin ? 'Administrador local' : 'Bypass local',
+        }
+      : null)
+
   const [hoveredItem, setHoveredItem] = useState(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showProfilePopup, setShowProfilePopup] = useState(false)
+
+  const popupRef = useRef(null)
+  const buttonRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        showProfilePopup &&
+        popupRef.current &&
+        !popupRef.current.contains(event.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target)
+      ) {
+        setShowProfilePopup(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showProfilePopup])
 
   return (
     <>
       <aside
-        className="sidebar-scroll flex flex-col w-[220px] min-w-[220px] h-screen bg-bg-sidebar shadow-sidebar overflow-y-auto"
-        style={{ zIndex: 10 }}
+        className="sidebar-scroll relative flex flex-col w-[220px] min-w-[220px] h-screen bg-bg-sidebar shadow-sidebar overflow-y-auto z-[10000]"
       >
         <div className="px-5 pt-6 pb-6 border-b border-white/5">
           <img src="/src/assets/logo-claro.svg" alt="SMDN Logo" className="w-full max-w-[160px]" />
@@ -102,6 +166,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               <p className="px-3 pb-2 text-[10px] uppercase tracking-[0.18em] text-text-on-dark/50 font-bold">
                 Administração
               </p>
+
               <div className="space-y-0.5">
                 {ADMIN_ITEMS.map((item) => (
                   <NavButton
@@ -120,26 +185,61 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
 
         <div className="px-3 py-4 border-t border-white/5 space-y-2">
           {displayUser && (
-            <div className="flex items-center gap-3 px-3 py-2">
-              {displayUser.avatar || displayUser.perfil?.prf_avatar_url ? (
-                <img
-                  src={displayUser.avatar || displayUser.perfil?.prf_avatar_url}
-                  alt={displayUser.name || 'Foto do usuário'}
-                  className="w-8 h-8 rounded-full object-cover border border-white/10 bg-text-main/30 flex-shrink-0"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-text-main/30 flex items-center justify-center flex-shrink-0">
-                  <span className="text-text-on-dark text-xs font-bold">
-                    {displayUser.name?.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                  </span>
+            <div className="relative">
+              <button
+                ref={buttonRef}
+                onClick={() => setShowProfilePopup((value) => !value)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-all"
+              >
+                <UserAvatar user={displayUser} />
+
+                <div className="min-w-0 text-left">
+                  <p className="text-white text-xs font-semibold truncate">
+                    {displayUser.name}
+                  </p>
+                  <p className="text-text-on-dark text-[10px] opacity-60 truncate">
+                    {displayUser.roleLabel || displayUser.role}
+                  </p>
+                </div>
+              </button>
+
+              {showProfilePopup && (
+                <div
+                  ref={popupRef}
+                  className="fixed bottom-14 left-[210px] w-72 bg-white rounded-2xl shadow-2xl p-5 z-[99999] border border-slate-200"
+                >
+                  <div className="flex flex-col items-center">
+                    <UserAvatar user={displayUser} size="lg" />
+
+                    <h3 className="mt-3 font-bold text-slate-800">
+                      {displayUser.name}
+                    </h3>
+
+                    <p className="text-sm text-slate-500">
+                      {displayUser.roleLabel || displayUser.role}
+                    </p>
+
+                    <div className="w-full border-t mt-3 pt-3 text-sm text-slate-600 space-y-2">
+                      <p>{displayUser.institution || displayUser.instituicao?.ins_numero || 'SMDN'}</p>
+                      <p className="truncate">{displayUser.email}</p>
+                      <p>{displayUser.phone || displayUser.perfil?.prf_telefone || 'Telefone não informado'}</p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setCurrentScreen('perfil')
+                        setShowProfilePopup(false)
+                      }}
+                      className="w-full mt-4 bg-[#597891] hover:bg-[#4A6A83] text-white py-2 rounded-lg font-semibold transition"
+                    >
+                      Editar Perfil
+                    </button>
+                  </div>
                 </div>
               )}
-              <div className="min-w-0">
-                <p className="text-white text-xs font-semibold truncate">{displayUser.name}</p>
-                <p className="text-text-on-dark text-[10px] opacity-60 truncate">{displayUser.roleLabel || displayUser.role}</p>
-              </div>
             </div>
           )}
+
           <button
             onClick={() => setShowLogoutConfirm(true)}
             onMouseEnter={() => setHoveredItem('logout')}
@@ -153,16 +253,25 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
       </aside>
 
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowLogoutConfirm(false)} />
+
           <div className="relative bg-white rounded-2xl shadow-modal px-8 py-7 flex flex-col items-center gap-4 max-w-xs w-full mx-4 animate-slide-up">
             <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-              <img src={logoutIcon} width="22" height="22" alt="log-out" style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(10%) saturate(500%) hue-rotate(180deg)' }} />
+              <img
+                src={logoutIcon}
+                width="22"
+                height="22"
+                alt="log-out"
+                style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(10%) saturate(500%) hue-rotate(180deg)' }}
+              />
             </div>
+
             <div className="text-center">
               <h3 className="text-lg font-bold text-slate-800">Deseja fazer logout?</h3>
               <p className="text-sm text-slate-500 mt-1">Você será redirecionado para a tela de login.</p>
             </div>
+
             <div className="flex gap-3 w-full mt-1">
               <button
                 onClick={() => setShowLogoutConfirm(false)}
@@ -170,8 +279,12 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               >
                 Não
               </button>
+
               <button
-                onClick={() => { setShowLogoutConfirm(false); onLogout() }}
+                onClick={() => {
+                  setShowLogoutConfirm(false)
+                  onLogout()
+                }}
                 className="flex-1 py-2.5 rounded-lg bg-bg-sidebar text-white text-sm font-semibold hover:opacity-90 transition-all"
               >
                 Sim, sair

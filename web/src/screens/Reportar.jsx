@@ -207,6 +207,13 @@ export default function Reportar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const clearFilters = () => {
+    setFilterSeverity('')
+    setFilterCity('')
+    setFilterDate('')
+    setFilterOperator('')
+  }
+
   const handleDispatch = () => {
     setIsModalOpen(false)
     setSuccessMsg(true)
@@ -318,6 +325,13 @@ export default function Reportar() {
               value={filterOperator}
               onChange={(e) => setFilterOperator(e.target.value)}
             />
+
+            <button
+              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg px-2 py-2 transition-colors"
+              onClick={clearFilters}
+            >
+              Limpar filtros
+            </button>
           </div>
         </div>
 
