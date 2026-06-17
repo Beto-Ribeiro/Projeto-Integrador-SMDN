@@ -6,7 +6,7 @@ import mailIcon from '../assets/perfil/mail.svg'
 import phoneIcon from '../assets/perfil/phone.svg'
 import { useAuth } from '../hooks/useAuth.js'
 import { formatBrazilPhone } from '../utils/phone.js'
-import { formatActivityDate, formatUserActivity, listUserActivities } from '../backend/perfil/profileActivityService.js'
+import { formatActivityDate, formatUserActivity, getActivityDetails, listUserActivities } from '../backend/perfil/profileActivityService.js'
 import { uploadAvatarFile } from '../backend/perfil/avatarService.js'
 import {
   buildProfileChanges,
@@ -71,28 +71,188 @@ function ProfileInfoIcon({ src, alt }) {
   )
 }
 
-function ActivityList({ activities, currentUser }) {
-  const items = activities.length > 0 ? activities : FALLBACK_ACTIVITY
+function initialsFromName(name) {
+  return String(name || 'SMDN')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+function flattenDetailRows(details, limit = 4) {
+  const rows = []
+
+  for (const section of details?.sections || []) {
+    for (const row of section.rows || []) {
+      if (!row?.value || row.value === '—') continue
+      rows.push({ ...row, section: section.title })
+      if (rows.length >= limit) return rows
+    }
+  }
+
+  return rows
+}
+
+function getFloatingPosition(position, width = 340, height = 180) {
+  if (typeof window === 'undefined' || !position) return { left: 0, top: 0 }
+
+  return {
+    left: Math.min(position.x + 16, window.innerWidth - width - 16),
+    top: Math.min(position.y + 16, window.innerHeight - height - 16),
+  }
+}
+
+function ActivityHoverSummary({ details, position }) {
+  if (!details || !position) return null
+
+  const rows = flattenDetailRows(details, 4)
+  const style = getFloatingPosition(position)
 
   return (
-    <div className="space-y-2.5">
-      {items.map((activity, index) => {
-        const isDatabaseActivity = Boolean(activity.atu_id)
-        const action = isDatabaseActivity ? activity.atu_action : activity.action
-        const target = isDatabaseActivity ? formatUserActivity(activity, currentUser) : activity.target
-        const at = isDatabaseActivity ? formatActivityDate(activity.atu_created_at) : activity.at
-
-        return (
-          <div key={activity.atu_id || index} className="flex items-start gap-3 text-sm">
-            <div className="w-2 h-2 rounded-full bg-text-main/50 flex-shrink-0 mt-2" />
-            <span className="text-slate-600 leading-relaxed">
-              <strong className="text-slate-800">{action}</strong> – {target}
-            </span>
-            <span className="ml-auto text-xs text-slate-400 whitespace-nowrap pt-0.5">{at}</span>
+    <div
+      className="fixed z-[99999] w-[340px] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-2xl pointer-events-none"
+      style={style}
+    >
+      <div className="flex items-start gap-3">
+        {details.actor?.avatar ? (
+          <img src={details.actor.avatar} alt={details.actor.name || 'Responsável'} className="h-9 w-9 rounded-full object-cover border border-slate-200" />
+        ) : (
+          <div className="h-9 w-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">
+            {initialsFromName(details.actor?.name)}
           </div>
-        )
-      })}
+        )}
+
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-800 leading-snug line-clamp-2">{details.title}</p>
+          {details.actor?.name && <p className="text-xs text-slate-500 truncate">por {details.actor.name}</p>}
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        {rows.map((row) => (
+          <div key={`${row.section}-${row.label}`} className="grid grid-cols-[96px_1fr] gap-2 text-xs">
+            <span className="font-semibold text-slate-400 truncate">{row.label}</span>
+            <span className="text-slate-700 truncate">{row.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 text-[11px] font-semibold text-text-main">Clique na atividade para ver todos os detalhes.</p>
     </div>
+  )
+}
+
+function ActivityDetailsDialog({ details, onClose }) {
+  if (!details) return null
+
+  return (
+    <div className="fixed inset-0 z-[100000]" onClick={onClose}>
+      <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-[1px]" />
+
+      <div
+        className="absolute right-6 top-6 flex max-h-[calc(100vh-3rem)] w-[min(34rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 border-b border-slate-100 p-5">
+          {details.actor?.avatar ? (
+            <img src={details.actor.avatar} alt={details.actor.name || 'Responsável'} className="h-12 w-12 rounded-full object-cover border border-slate-200" />
+          ) : (
+            <div className="h-12 w-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-sm font-bold">
+              {initialsFromName(details.actor?.name)}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-slate-800 leading-snug">{details.title}</p>
+            {details.actor?.name && <p className="text-xs text-slate-500 truncate">por {details.actor.name}</p>}
+            {details.actor?.email && <p className="text-xs text-slate-400 truncate">{details.actor.email}</p>}
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+            aria-label="Fechar detalhes"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {details.sections.map((section) => (
+            <div key={section.title} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-2">{section.title}</p>
+              <div className="space-y-2">
+                {section.rows.map((row) => (
+                  <div key={`${section.title}-${row.label}`} className="grid grid-cols-[120px_1fr] gap-3 text-sm">
+                    <span className="font-semibold text-slate-500">{row.label}</span>
+                    <span className="text-slate-700 break-words">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ActivityList({ activities, currentUser }) {
+  const items = activities.length > 0 ? activities : FALLBACK_ACTIVITY
+  const [hoverDetails, setHoverDetails] = useState(null)
+  const [hoverPosition, setHoverPosition] = useState(null)
+  const [openedDetails, setOpenedDetails] = useState(null)
+
+  function handleMouseMove(event, details) {
+    if (!details) return
+    setHoverDetails(details)
+    setHoverPosition({ x: event.clientX, y: event.clientY })
+  }
+
+  function closeHover() {
+    setHoverDetails(null)
+    setHoverPosition(null)
+  }
+
+  return (
+    <>
+      <div className="space-y-2.5">
+        {items.map((activity, index) => {
+          const isDatabaseActivity = Boolean(activity.atu_id)
+          const action = isDatabaseActivity ? activity.atu_action : activity.action
+          const target = isDatabaseActivity ? formatUserActivity(activity, currentUser) : activity.target
+          const at = isDatabaseActivity ? formatActivityDate(activity.atu_created_at) : activity.at
+          const details = isDatabaseActivity ? getActivityDetails(activity, currentUser) : null
+
+          return (
+            <button
+              key={activity.atu_id || index}
+              type="button"
+              className="relative flex w-full items-start gap-3 rounded-xl -mx-2 px-2 py-1.5 text-left text-sm hover:bg-slate-50 transition-all"
+              onMouseMove={(event) => handleMouseMove(event, details)}
+              onMouseLeave={closeHover}
+              onClick={() => {
+                if (!details) return
+                closeHover()
+                setOpenedDetails(details)
+              }}
+            >
+              <div className="w-2 h-2 rounded-full bg-text-main/50 flex-shrink-0 mt-2" />
+              <span className="text-slate-600 leading-relaxed">
+                <strong className="text-slate-800">{action}</strong> – {target}
+              </span>
+              <span className="ml-auto text-xs text-slate-400 whitespace-nowrap pt-0.5">{at}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <ActivityHoverSummary details={hoverDetails} position={hoverPosition} />
+      <ActivityDetailsDialog details={openedDetails} onClose={() => setOpenedDetails(null)} />
+    </>
   )
 }
 
@@ -219,7 +379,7 @@ export default function Perfil() {
   const initials = form.name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
 
   return (
-    <div className="p-8 flex flex-col gap-6 animate-fade-in h-full min-h-full">
+    <div className="p-8 flex flex-col gap-6 animate-fade-in h-full min-h-0 overflow-hidden">
       {saved && (
         <div className="flex items-center gap-3 bg-status-success-bg border border-status-success/30 text-status-success font-semibold text-sm px-4 py-3 rounded-lg animate-slide-up flex-shrink-0">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -231,7 +391,7 @@ export default function Perfil() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-        <Card className="lg:col-span-1 flex flex-col items-center text-center py-8 gap-4 h-full">
+        <Card className="lg:col-span-1 flex flex-col items-center text-center py-8 gap-4 h-full min-h-0 overflow-hidden">
           {form.avatarUrl ? (
             <img
               src={form.avatarUrl}
@@ -266,8 +426,8 @@ export default function Perfil() {
           </button>
         </Card>
 
-        <div className="lg:col-span-2 flex flex-col gap-5 h-full">
-          <Card>
+        <div className="lg:col-span-2 flex flex-col gap-5 h-full min-h-0 overflow-hidden">
+          <Card className="flex-shrink-0">
             <h3 className="text-card-title font-bold text-slate-800 mb-4">Permissões de Acesso</h3>
             <div className="grid grid-cols-2 gap-2">
               {permissions.map((p) => (
@@ -289,9 +449,11 @@ export default function Perfil() {
             </div>
           </Card>
 
-          <Card className="flex-1">
-            <h3 className="text-card-title font-bold text-slate-800 mb-4">Atividade Recente</h3>
-            <ActivityList activities={activities} currentUser={user} />
+          <Card className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <h3 className="text-card-title font-bold text-slate-800 mb-4 flex-shrink-0">Atividade Recente</h3>
+            <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-2">
+              <ActivityList activities={activities} currentUser={user} />
+            </div>
           </Card>
         </div>
       </div>

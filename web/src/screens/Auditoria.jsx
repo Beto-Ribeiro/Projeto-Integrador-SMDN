@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card'
+import Modal from '../components/Modal'
 import authIcon from '../assets/menu/inativo/lock.svg'
 import alertIcon from '../assets/auditoria/alert-triangle.svg'
 import recordIcon from '../assets/auditoria/flag.svg'
@@ -18,8 +19,74 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+function initials(name) {
+  return String(name || 'SMDN')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+function PersonBadge({ person, label }) {
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      {person?.avatar ? (
+        <img src={person.avatar} alt={person.name || label} className="h-7 w-7 rounded-full object-cover border border-white/70 bg-white" />
+      ) : (
+        <div className="h-7 w-7 rounded-full bg-white/80 border border-border-soft flex items-center justify-center text-[10px] font-bold text-slate-500">
+          {initials(person?.name)}
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400 font-bold leading-none">{label}</p>
+        <p className="text-xs text-slate-700 font-bold truncate">{person?.name || '—'}</p>
+      </div>
+    </div>
+  )
+}
+
+function AuditDetails({ entry }) {
+  if (!entry) return null
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border-soft bg-slate-50 p-4 flex items-start gap-3">
+        {entry.actor?.avatar ? (
+          <img src={entry.actor.avatar} alt={entry.actor.name || 'Responsável'} className="h-12 w-12 rounded-full object-cover border border-slate-200" />
+        ) : (
+          <div className="h-12 w-12 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-500">
+            {initials(entry.actor?.name)}
+          </div>
+        )}
+        <div className="min-w-0">
+          <h3 className="font-bold text-slate-800">{entry.actionLabel}</h3>
+          <p className="text-sm text-slate-500">Responsável: {entry.actor?.name || 'Sistema'}</p>
+          {entry.actor?.email && <p className="text-xs text-slate-400 truncate">{entry.actor.email}</p>}
+        </div>
+      </div>
+
+      {(entry.details || []).map((section) => (
+        <div key={section.title} className="rounded-2xl border border-border-soft p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-3">{section.title}</p>
+          <div className="space-y-2">
+            {section.rows.map((row) => (
+              <div key={`${section.title}-${row.label}`} className="grid grid-cols-[140px_1fr] gap-3 text-sm">
+                <span className="text-slate-500 font-semibold">{row.label}</span>
+                <span className="text-slate-700 break-words">{row.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Auditoria() {
   const [entries, setEntries] = useState([])
+  const [selectedEntry, setSelectedEntry] = useState(null)
   const [filterType, setFilterType] = useState('all')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -43,14 +110,14 @@ export default function Auditoria() {
     loadAudit()
   }, [])
 
-  const users = useMemo(() => [...new Set(entries.map((entry) => entry.user).filter(Boolean))], [entries])
+  const users = useMemo(() => [...new Set(entries.map((entry) => entry.actor?.name).filter(Boolean))], [entries])
 
   const filtered = useMemo(() => {
     return entries.filter((entry) => {
       if (filterType !== 'all' && entry.type !== filterType) return false
       if (search) {
         const q = search.toLowerCase()
-        const content = [entry.action, entry.actionLabel, entry.user, entry.detail, entry.role].join(' ').toLowerCase()
+        const content = entry.searchText || [entry.action, entry.actionLabel, entry.actor?.name, entry.target?.name, entry.detail, entry.role].join(' ').toLowerCase()
         if (!content.includes(q)) return false
       }
       return true
@@ -89,7 +156,7 @@ export default function Auditoria() {
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
               <path d="M10.5 10.5L13.5 13.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
-            <input className="input-field pl-9" placeholder="Buscar ação, usuário, detalhe..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="input-field pl-9" placeholder="Buscar ação, responsável, afetado ou detalhe..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <select className="select-field w-auto" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
@@ -116,25 +183,30 @@ export default function Auditoria() {
                 filtered.map((entry) => {
                   const cfg = TYPE_CONFIG[entry.type] || TYPE_CONFIG.record
                   return (
-                    <div key={entry.id} className="flex gap-4 relative">
+                    <button key={entry.id} onClick={() => setSelectedEntry(entry)} className="w-full flex gap-4 relative text-left group">
                       <div className={`w-10 h-10 rounded-full ${cfg.color} flex items-center justify-center flex-shrink-0 z-10 text-base shadow-sm`}>
                         <span>{cfg.icon}</span>
                       </div>
-                      <div className={`flex-1 rounded-lg border border-border-soft ${cfg.light} px-4 py-3`}>
+                      <div className={`flex-1 rounded-lg border border-border-soft ${cfg.light} px-4 py-3 group-hover:shadow-card transition-all`}>
                         <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs font-bold ${cfg.text}`}>{entry.actionLabel || entry.action}</span>
-                            <span className="text-xs text-slate-500">por <strong className="text-slate-700">{entry.user}</strong></span>
-                            <span className="text-[10px] text-slate-400 bg-white border border-border-soft rounded px-1.5 py-0.5">{entry.role}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs font-bold ${cfg.text}`}>{entry.actionLabel || entry.action}</span>
+                              <span className="text-[10px] text-slate-400 bg-white border border-border-soft rounded px-1.5 py-0.5">{entry.role}</span>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <PersonBadge person={entry.actor} label="Responsável" />
+                              <PersonBadge person={entry.target} label="Afetado / alvo" />
+                            </div>
                           </div>
                           <div className="flex items-center gap-2 text-[11px] text-slate-400">
                             <span>{formatDate(entry.at)}</span>
                             <span className="font-mono bg-white border border-border-soft rounded px-1.5 py-0.5">{entry.ip}</span>
                           </div>
                         </div>
-                        <p className="text-sm text-slate-600 mt-1">{entry.detail}</p>
+                        <p className="text-sm text-slate-600 mt-2">{entry.detail}</p>
                       </div>
-                    </div>
+                    </button>
                   )
                 })
               )}
@@ -142,6 +214,10 @@ export default function Auditoria() {
           </div>
         </div>
       </Card>
+
+      <Modal isOpen={Boolean(selectedEntry)} onClose={() => setSelectedEntry(null)} title="Detalhes da auditoria" size="lg">
+        <AuditDetails entry={selectedEntry} />
+      </Modal>
     </div>
   )
 }

@@ -44,6 +44,16 @@ async function getProfileName(userId) {
   return data?.prf_nome || 'Administrador'
 }
 
+function getActorInfo(actorUser, actorUserId, actorName) {
+  return {
+    id: actorUserId || null,
+    name: actorName || actorUser?.name || actorUser?.email || 'Administrador',
+    email: actorUser?.contactEmail || actorUser?.perfil?.prf_email_contato || actorUser?.email || null,
+    avatar: actorUser?.avatar || actorUser?.perfil?.prf_avatar_url || null,
+    role: actorUser?.roleLabel || actorUser?.role || null,
+  }
+}
+
 function normalizeProfileType(value) {
   return String(value || '')
     .trim()
@@ -232,6 +242,7 @@ export async function updateUserProfileByAdmin({ user, form, actorUser }) {
     atu_detail: detail,
     atu_metadata: {
       actorName,
+      actor: getActorInfo(actorUser, actorUserId, actorName),
       actorIsTarget: actorUserId === user.prf_id,
       targetName: data.prf_nome,
       changes,
@@ -254,7 +265,7 @@ export async function updateUserProfileByAdmin({ user, form, actorUser }) {
       entity_type: 'Perfis',
       entity_id: user.prf_id,
       detail,
-      metadata: { actorName, before, after: data, changes },
+      metadata: { actorName, actor: getActorInfo(actorUser, actorUserId, actorName), before, after: data, changes },
     })
 
   if (auditError && !isMissingRelationError(auditError)) {

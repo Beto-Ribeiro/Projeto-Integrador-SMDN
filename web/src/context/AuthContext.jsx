@@ -2,6 +2,7 @@ import { createContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../backend/supabase/client.js'
 import { signInWithEmailAndPassword, signOutFromSupabase } from '../backend/auth/authService.js'
 import { getWebAccessForUser } from '../backend/auth/webAccessService.js'
+import { recordLoginActivity } from '../backend/perfil/profileActivityService.js'
 
 export const AuthContext = createContext()
 
@@ -109,6 +110,10 @@ export const AuthProvider = ({ children }) => {
     if (!access?.allowed) {
       throw new Error(access?.reason || 'Usuário sem permissão para acessar o painel web.')
     }
+
+    await recordLoginActivity(access.user?.id).catch((error) => {
+      console.warn('[SMDN Auth] Login autenticado, mas a atividade de login não foi registrada:', error.message)
+    })
 
     return data
   }
