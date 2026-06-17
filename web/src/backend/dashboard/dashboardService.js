@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase.js'
+import { supabase } from '../supabase/client.js'
 
 const PHOTO_BUCKET = 'Fotos_Storage'
 

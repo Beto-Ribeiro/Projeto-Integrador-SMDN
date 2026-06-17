@@ -9,7 +9,7 @@ import {
   dispatchAlert,
   listAlerts,
   subscribeReportarData,
-} from '../services/alertService.js'
+} from '../backend/alertas/alertService.js'
 
 const ALERT_TYPES = ['Enchente', 'Deslizamento', 'Temporal', 'Tornado']
 const SEVERITIES = ['critical', 'severe', 'regular']

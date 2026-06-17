@@ -6,14 +6,14 @@ import mailIcon from '../assets/perfil/mail.svg'
 import phoneIcon from '../assets/perfil/phone.svg'
 import { useAuth } from '../hooks/useAuth.js'
 import { formatBrazilPhone } from '../utils/phone.js'
-import { formatActivityDate, formatUserActivity, listUserActivities } from '../services/profileActivityService.js'
-import { uploadAvatarFile } from '../services/avatarService.js'
+import { formatActivityDate, formatUserActivity, listUserActivities } from '../backend/perfil/profileActivityService.js'
+import { uploadAvatarFile } from '../backend/perfil/avatarService.js'
 import {
   buildProfileChanges,
   hasProfileChanges,
   requestProfileChange,
   updateOwnProfileDirect,
-} from '../services/profileChangeService.js'
+} from '../backend/perfil/profileChangeService.js'
 
 const PERMISSIONS = [
   { key: 'dashboard', label: 'Dashboard', granted: true },

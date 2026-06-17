@@ -6,7 +6,7 @@ import {
   getOcorrenciasData,
   subscribeOcorrenciasChanges,
   updateOcorrenciaStatus,
-} from '../services/ocorrenciasService.js'
+} from '../backend/ocorrencias/ocorrenciasService.js'
 
 const SEVERITY_MAP = {
   critical: { label: 'Crítico', cls: 'badge-critical' },

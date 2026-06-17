@@ -9,7 +9,7 @@ import Check from '../assets/menu/inativo/map-pin.svg'
 import {
   getDashboardData,
   subscribeDashboardChanges,
-} from '../services/dashboardService.js'
+} from '../backend/dashboard/dashboardService.js'
 
 const SEVERITY_CONFIG = {
   critical: { label: 'Crítico', cls: 'badge-critical', dotColor: '#c60202' },

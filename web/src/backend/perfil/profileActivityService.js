@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../supabase/client.js'
 
 function isMissingRelationError(error) {
   return error?.code === '42P01' || String(error?.message || '').toLowerCase().includes('does not exist')

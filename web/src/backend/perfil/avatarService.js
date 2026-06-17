@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../supabase/client.js'
 
 const BUCKET = 'avatars'
 const MAX_SIZE_BYTES = 2 * 1024 * 1024

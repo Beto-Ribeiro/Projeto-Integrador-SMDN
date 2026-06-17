@@ -8,7 +8,7 @@ import {
   listWebProfiles,
   rejectAccessRequest,
   rejectProfileChangeRequest,
-} from '../services/adminService'
+} from '../backend/admin/adminService.js'
 
 const STATUS_LABEL = {
   pendente: 'Pendente',

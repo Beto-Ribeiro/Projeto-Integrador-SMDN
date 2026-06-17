@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase'
-import { canAccessAdmin, canAccessWeb, getRoleLabel, normalizeRole } from '../utils/webRoles'
+import { supabase } from '../supabase/client.js'
+import { canAccessAdmin, canAccessWeb, getRoleLabel, normalizeRole } from '../../utils/webRoles.js'
 
 function isMissingRelationError(error) {
   return error?.code === '42P01' || String(error?.message || '').toLowerCase().includes('does not exist')

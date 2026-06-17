@@ -2,15 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import { useAuth } from '../hooks/useAuth.js'
 import { formatBrazilPhone } from '../utils/phone.js'
-import { uploadAvatarFile } from '../services/avatarService.js'
-import { formatActivityDate, formatUserActivity, listUserActivities } from '../services/profileActivityService.js'
+import { uploadAvatarFile } from '../backend/perfil/avatarService.js'
+import { formatActivityDate, formatUserActivity, listUserActivities } from '../backend/perfil/profileActivityService.js'
 import {
   DEFAULT_PERMISSIONS,
   PERMISSION_LABELS,
   listUsersForAdmin,
   resetUserProfileByAdmin,
   updateUserProfileByAdmin,
-} from '../services/userAdminService.js'
+} from '../backend/admin/userAdminService.js'
 
 function formatDate(value) {
   if (!value) return '—'

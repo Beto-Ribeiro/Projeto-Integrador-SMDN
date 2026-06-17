@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase'
-import { formatUserActivity } from './profileActivityService.js'
+import { supabase } from '../supabase/client.js'
+import { formatUserActivity } from '../perfil/profileActivityService.js'
 
 function isMissingRelationError(error) {
   return error?.code === '42P01' || String(error?.message || '').toLowerCase().includes('does not exist')

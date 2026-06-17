@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase'
-import { formatBrazilPhone } from '../utils/phone.js'
+import { supabase } from '../supabase/client.js'
+import { formatBrazilPhone } from '../../utils/phone.js'
 
 function normalize(value) {
   return String(value ?? '').trim()

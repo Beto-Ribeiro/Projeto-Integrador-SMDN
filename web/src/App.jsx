@@ -10,7 +10,7 @@ import AdminPanel from './screens/AdminPanel.jsx'
 import UserList from './screens/UserList.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import { useAuth } from './hooks/useAuth.js'
-import { createWebAccessRequest } from './services/webAccessService.js'
+import { createWebAccessRequest } from './backend/auth/webAccessService.js'
 
 function AdminHomeScreen() {
   return <AdminPanel initialTab="all" />

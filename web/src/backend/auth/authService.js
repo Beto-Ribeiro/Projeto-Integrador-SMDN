@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../supabase/client.js'
 
 function mapAuthError(error) {
   const message = String(error?.message || '')

@@ -1,7 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { signInWithEmailAndPassword, signOutFromSupabase } from '../services/authService'
-import { getWebAccessForUser } from '../services/webAccessService'
+import { supabase } from '../backend/supabase/client.js'
+import { signInWithEmailAndPassword, signOutFromSupabase } from '../backend/auth/authService.js'
+import { getWebAccessForUser } from '../backend/auth/webAccessService.js'
 
 export const AuthContext = createContext()
 

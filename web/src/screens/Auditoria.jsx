@@ -4,7 +4,7 @@ import authIcon from '../assets/menu/inativo/lock.svg'
 import alertIcon from '../assets/auditoria/alert-triangle.svg'
 import recordIcon from '../assets/auditoria/flag.svg'
 import userIcon from '../assets/auditoria/user.svg'
-import { listAuditEvents } from '../services/auditService.js'
+import { listAuditEvents } from '../backend/auditoria/auditService.js'
 
 const TYPE_CONFIG = {
   auth: { color: 'bg-text-main', light: 'bg-blue-50', text: 'text-text-main', icon: <img src={authIcon} width="20" height="20" alt="lock" /> },
