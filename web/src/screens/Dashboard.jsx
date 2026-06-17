@@ -56,6 +56,7 @@ export default function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [mapMode, setMapMode] = useState('heat')
   const mapRef = useRef(null)
 
   const mapOccurrences = useMemo(
@@ -118,7 +119,31 @@ export default function Dashboard() {
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-100 p-4 animate-fade-in">
       <Card className="absolute inset-4 !p-0 overflow-hidden border border-slate-200 shadow-sm z-0">
-        <MapView ref={mapRef} ocorrencias={mapOccurrences} />
+        <MapView ref={mapRef} ocorrencias={mapOccurrences} heatmap={mapMode === 'heat'} />
+
+        <div className="absolute top-4 left-4 z-[500] flex rounded-xl bg-white/90 backdrop-blur-sm border border-border-soft shadow-sm overflow-hidden">
+          <button
+            className={`px-3 py-2 text-xs font-bold transition-colors ${mapMode === 'heat' ? 'bg-text-main text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            onClick={() => setMapMode('heat')}
+          >
+            Mapa de calor
+          </button>
+          <button
+            className={`px-3 py-2 text-xs font-bold transition-colors ${mapMode === 'points' ? 'bg-text-main text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            onClick={() => setMapMode('points')}
+          >
+            Pontos
+          </button>
+        </div>
+
+        <div className="absolute bottom-4 left-4 z-[500] rounded-xl bg-white/90 backdrop-blur-sm border border-border-soft shadow-sm px-3 py-2 text-xs text-slate-600">
+          <p className="font-bold text-slate-700 mb-1">Intensidade</p>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-status-critical" /> Crítico</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-status-severe" /> Grave</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-status-regular" /> Moderado</span>
+          </div>
+        </div>
       </Card>
 
       <Card className="absolute top-8 right-8 w-80 max-h-[430px] shadow-xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-0 overflow-hidden flex flex-col z-10">
