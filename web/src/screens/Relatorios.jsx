@@ -4,25 +4,17 @@
  * Exportação PDF  → html2canvas + jsPDF (captura só o div#relatorio-content)
  * Exportação Excel → SheetJS (xlsx) com múltiplas abas
  *
- * ─── Como conectar ao backend ────────────────────────────────────────────────
- * Todos os dados vivem no objeto `reportData` dentro do hook `useReportData`.
- * Hoje ele retorna dados estáticos (mock). Quando o banco estiver pronto,
- * basta substituir o conteúdo do hook por uma chamada à API, ex.:
+ * Dados reais → Supabase RPC public.get_relatorios_data(period)
+ * Exportação PDF e Excel continuam usando o layout atual, sem mudar o design.
  *
- *   const { data } = useQuery(['report', period], () => api.getReport(period))
- *   return data ?? FALLBACK_DATA
- *
- * O restante do componente — PDF, Excel, gráficos — funciona sem nenhuma
- * outra alteração, pois tudo já consome `reportData`.
- * ─────────────────────────────────────────────────────────────────────────────
- *
- * Dependências necessárias (instalar uma vez):
- *   npm install html2canvas jspdf xlsx
+ * Dependências necessárias:
+ *   html2canvas, jspdf, xlsx
  */
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Card from '../components/Card'
 import externalIcon from '../assets/relatorios/external-link.svg'
+import { getRelatoriosData, subscribeRelatoriosChanges } from '../backend/relatorios/relatoriosService.js'
 
 // ─── Dependências de exportação ──────────────────────────────────────────────
 // Se ainda não instalou: npm install html2canvas jspdf xlsx
@@ -31,64 +23,87 @@ import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOOK DE DADOS
-// Centraliza todos os dados do relatório num único lugar.
-// Substituir o corpo deste hook pela chamada à API quando o backend estiver pronto.
+// HOOK DE DADOS REAIS
+// Centraliza a chamada ao Supabase sem alterar o desenho visual da tela.
 // ─────────────────────────────────────────────────────────────────────────────
+const EMPTY_REPORT_DATA = {
+  kpis: {
+    total: 0,
+    totalDelta: '0%',
+    totalPositive: true,
+    resolutionRate: '0%',
+    resolutionDelta: '0%',
+    resolutionPositive: true,
+  },
+  monthly: [
+    { month: 'Jan', total: 0, critical: 0 },
+    { month: 'Fev', total: 0, critical: 0 },
+    { month: 'Mar', total: 0, critical: 0 },
+    { month: 'Abr', total: 0, critical: 0 },
+    { month: 'Mai', total: 0, critical: 0 },
+    { month: 'Jun', total: 0, critical: 0 },
+    { month: 'Jul', total: 0, critical: 0 },
+  ],
+  byType: [],
+  byCity: [],
+  bySeverity: [
+    { label: 'Crítico', count: 0, pct: 0, color: 'bg-status-critical', text: 'text-status-critical' },
+    { label: 'Grave', count: 0, pct: 0, color: 'bg-status-severe', text: 'text-status-severe' },
+    { label: 'Moderado', count: 0, pct: 0, color: 'bg-status-regular', text: 'text-status-regular' },
+    { label: 'Normal', count: 0, pct: 0, color: 'bg-status-success', text: 'text-status-success' },
+  ],
+  byStatus: [
+    { label: 'Resolvidas', count: 0, pct: 0, color: '#02c602' },
+    { label: 'Em andamento', count: 0, pct: 0, color: '#ff6a00' },
+    { label: 'Pendentes', count: 0, pct: 0, color: '#c60202' },
+  ],
+  occurrences: [],
+}
+
 function useReportData(period) {
-  // TODO: substituir pelo fetch real quando o BD estiver pronto
-  // Exemplo:
-  //   const [data, setData] = useState(null)
-  //   useEffect(() => { api.getReport(period).then(setData) }, [period])
-  //   if (!data) return { loading: true, data: FALLBACK_DATA }
+  const [state, setState] = useState({
+    loading: true,
+    error: '',
+    data: EMPTY_REPORT_DATA,
+  })
 
-  const data = {
-    kpis: {
-      total: 327,
-      totalDelta: '+12%',
-      totalPositive: false,
-      resolutionRate: '89%',
-      resolutionDelta: '+5%',
-      resolutionPositive: true,
-    },
-    monthly: [
-      { month: 'Jul', total: 38, critical: 8 },
-      { month: 'Ago', total: 45, critical: 11 },
-      { month: 'Set', total: 29, critical: 5 },
-      { month: 'Out', total: 52, critical: 14 },
-      { month: 'Nov', total: 61, critical: 18 },
-      { month: 'Dez', total: 47, critical: 12 },
-      { month: 'Jan', total: 55, critical: 16 },
-    ],
-    byType: [
-      { type: 'Enchente',     count: 42, pct: 34 },
-      { type: 'Deslizamento', count: 28, pct: 22 },
-      { type: 'Temporal',     count: 21, pct: 17 },
-      { type: 'Tornado',      count: 1,  pct: 10 },
-      { type: 'Desabamento',  count: 4,  pct:  3 },
-    ],
-    byCity: [
-      { city: 'São José dos Campos', count: 51 },
-      { city: 'Taubaté',             count: 28 },
-      { city: 'Caraguatatuba',        count: 22 },
-      { city: 'Jacareí',             count: 17 },
-      { city: 'Pindamonhangaba',     count: 12 },
-      { city: 'Guaratinguetá',       count:  9 },
-    ],
-    bySeverity: [
-      { label: 'Crítico',  count: 58,  pct: 18, color: 'bg-status-critical', text: 'text-status-critical' },
-      { label: 'Grave',    count: 104, pct: 32, color: 'bg-status-severe',   text: 'text-status-severe'   },
-      { label: 'Moderado', count: 112, pct: 34, color: 'bg-status-regular',  text: 'text-status-regular'  },
-      { label: 'Normal',   count: 53,  pct: 16, color: 'bg-status-success',  text: 'text-status-success'  },
-    ],
-    byStatus: [
-      { label: 'Resolvidas',   count: 291, pct: 89, color: '#02c602' },
-      { label: 'Em andamento', count: 24,  pct:  7, color: '#ff6a00' },
-      { label: 'Pendentes',    count: 12,  pct:  4, color: '#c60202' },
-    ],
-  }
+  const load = useCallback(async ({ silent = false } = {}) => {
+    setState((prev) => ({ ...prev, loading: silent ? prev.loading : true, error: '' }))
 
-  return { loading: false, data }
+    try {
+      const data = await getRelatoriosData(period)
+      setState({ loading: false, error: '', data })
+    } catch (err) {
+      console.error('[SMDN Relatórios] Erro ao carregar dados reais:', err)
+      setState((prev) => ({
+        loading: false,
+        error: err?.message || 'Não foi possível carregar os relatórios.',
+        data: prev.data || EMPTY_REPORT_DATA,
+      }))
+    }
+  }, [period])
+
+  useEffect(() => {
+    let active = true
+
+    async function safeLoad() {
+      if (!active) return
+      await load()
+    }
+
+    safeLoad()
+
+    const unsubscribe = subscribeRelatoriosChanges(() => {
+      if (active) load({ silent: true })
+    })
+
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [load])
+
+  return state
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,7 +211,7 @@ function exportToExcel(data, period) {
       m.month,
       m.total,
       m.critical,
-      `${((m.critical / m.total) * 100).toFixed(1)}%`,
+      m.total > 0 ? `${((m.critical / m.total) * 100).toFixed(1)}%` : '0%',
     ]),
   ]
   const wsMensal = XLSX.utils.aoa_to_sheet(monthlyRows)
@@ -239,6 +254,37 @@ function exportToExcel(data, period) {
   wsStatus['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 14 }]
   XLSX.utils.book_append_sheet(wb, wsStatus, 'Status')
 
+  // ── Aba 7: Ocorrências detalhadas ───────────────────────────────────────────
+  const occurrenceRows = [
+    ['ID', 'Tipo', 'Descrição/Risco', 'Severidade', 'Status', 'Município', 'Cidadão', 'Data', 'Latitude', 'Longitude'],
+    ...(data.occurrences || []).map((item) => [
+      item.id,
+      item.tipo,
+      item.descricao,
+      item.severidade,
+      item.status,
+      item.municipio,
+      item.cidadaoNome,
+      item.data ? new Date(item.data).toLocaleString('pt-BR') : 'Data não informada',
+      item.lat,
+      item.lng,
+    ]),
+  ]
+  const wsOccurrences = XLSX.utils.aoa_to_sheet(occurrenceRows)
+  wsOccurrences['!cols'] = [
+    { wch: 38 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 22 },
+    { wch: 24 },
+    { wch: 20 },
+    { wch: 12 },
+    { wch: 12 },
+  ]
+  XLSX.utils.book_append_sheet(wb, wsOccurrences, 'Ocorrências')
+
   XLSX.writeFile(wb, `SMDN_Relatorio_${period.replace(/\s+/g, '_')}.xlsx`)
 }
 
@@ -280,15 +326,15 @@ export default function Relatorios() {
   const [exporting, setExporting] = useState(null) // 'pdf' | 'excel' | null
   const reportRef                 = useRef(null)
 
-  const { loading, data } = useReportData(period)
+  const { loading, error, data } = useReportData(period)
 
-  const maxTotal = Math.max(...data.monthly.map((m) => m.total))
-  const maxCity  = Math.max(...data.byCity.map((c) => c.count))
+  const maxTotal = Math.max(1, ...data.monthly.map((m) => m.total))
+  const maxCity  = Math.max(1, ...data.byCity.map((c) => c.count))
   const donutSegments = buildDonutSegments(data.byStatus)
 
   // ── Handlers de exportação ─────────────────────────────────────────────────
   const handleExportPDF = useCallback(async () => {
-    if (!reportRef.current || exporting) return
+    if (!reportRef.current || exporting || loading) return
     setExporting('pdf')
     try {
       await exportToPDF(reportRef.current, period)
@@ -298,10 +344,10 @@ export default function Relatorios() {
     } finally {
       setExporting(null)
     }
-  }, [period, exporting])
+  }, [period, exporting, loading])
 
   const handleExportExcel = useCallback(() => {
-    if (exporting) return
+    if (exporting || loading) return
     setExporting('excel')
     try {
       exportToExcel(data, period)
@@ -311,7 +357,7 @@ export default function Relatorios() {
     } finally {
       setExporting(null)
     }
-  }, [data, period, exporting])
+  }, [data, period, exporting, loading])
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -367,7 +413,7 @@ export default function Relatorios() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportPDF}
-              disabled={!!exporting}
+              disabled={!!exporting || loading}
               className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-wait"
             >
               <img src={externalIcon} width="13" height="13" alt="" />
@@ -375,7 +421,7 @@ export default function Relatorios() {
             </button>
             <button
               onClick={handleExportExcel}
-              disabled={!!exporting}
+              disabled={!!exporting || loading}
               className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-border-soft rounded-lg bg-bg-surface hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-wait"
             >
               <img src={externalIcon} width="13" height="13" alt="" />
@@ -384,6 +430,20 @@ export default function Relatorios() {
           </div>
         </div>
       </div>
+
+      {loading && (
+        <Card className="border border-blue-100 bg-blue-50/80">
+          <p className="text-sm font-semibold text-blue-900">Carregando dados reais do Supabase...</p>
+          <p className="text-xs text-blue-700 mt-1">A tela continua com o mesmo design, mas agora calcula tudo com Relato e Ocorrencia_Status.</p>
+        </Card>
+      )}
+
+      {error && (
+        <Card className="border border-red-100 bg-red-50/80">
+          <p className="text-sm font-semibold text-red-800">Não foi possível carregar os relatórios.</p>
+          <p className="text-xs text-red-700 mt-1">{error}</p>
+        </Card>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════
           ÁREA CAPTURADA PELO PDF
@@ -407,7 +467,7 @@ export default function Relatorios() {
                     >
                       <div
                         className="w-full bg-status-critical rounded-t"
-                        style={{ height: `${(m.critical / m.total) * 100}%` }}
+                        style={{ height: `${m.total > 0 ? (m.critical / m.total) * 100 : 0}%` }}
                       />
                     </div>
                   </div>
@@ -430,6 +490,9 @@ export default function Relatorios() {
           <Card>
             <h3 className="text-card-title font-bold text-slate-800 mb-5">Por Tipo</h3>
             <div className="space-y-3">
+              {data.byType.length === 0 && (
+                <p className="text-sm text-slate-400">Nenhuma ocorrência no período.</p>
+              )}
               {data.byType.map((t, i) => (
                 <div key={t.type}>
                   <div className="flex justify-between text-xs mb-1">
@@ -538,6 +601,9 @@ export default function Relatorios() {
         <Card>
           <h3 className="text-card-title font-bold text-slate-800 mb-5">Ocorrências por Município</h3>
           <div className="space-y-3">
+            {data.byCity.length === 0 && (
+              <p className="text-sm text-slate-400">Nenhuma ocorrência com município no período.</p>
+            )}
             {data.byCity.map((c) => (
               <div key={c.city} className="flex items-center gap-4">
                 <span className="text-sm text-slate-600 w-40 font-medium truncate">{c.city}</span>
