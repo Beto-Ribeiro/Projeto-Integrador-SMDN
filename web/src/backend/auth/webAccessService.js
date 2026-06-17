@@ -22,6 +22,66 @@ async function maybeGetSingle(table, idColumn, userId) {
   return data
 }
 
+function buildAccessResult({ authUser, perfil, role, allowed, admin, reason }) {
+  const permissions = {
+    ...(perfil?.prf_permissoes || {}),
+    admin,
+  }
+  const name = perfil?.prf_nome || authUser.email?.split('@')[0] || 'Usuário SMDN'
+
+  if (!allowed) {
+    return {
+      allowed: false,
+      isAdmin: false,
+      profile: perfil,
+      role,
+      reason,
+    }
+  }
+
+  return {
+    allowed: true,
+    isAdmin: admin,
+    profile: perfil,
+    role,
+    user: {
+      id: authUser.id,
+      email: authUser.email,
+      name,
+      role,
+      roleLabel: getRoleLabel(role),
+      isAdmin: admin,
+      avatar: perfil?.prf_avatar_url || null,
+      permissions,
+      perfil,
+      funcionario: null,
+      administrador: null,
+      instituicao: null,
+      raw: authUser,
+    },
+  }
+}
+
+async function getWebAccessByRpc(authUser) {
+  const { data, error } = await supabase.rpc('get_my_web_access')
+
+  if (error) {
+    console.warn('[SMDN Auth] RPC get_my_web_access indisponível, usando fallback:', error.message)
+    return null
+  }
+
+  if (!data) return null
+
+  return buildAccessResult({
+    authUser,
+    perfil: data.profile || null,
+    role: data.role || 'unknown',
+    allowed: Boolean(data.allowed),
+    admin: Boolean(data.isAdmin),
+    reason: data.reason || 'Seu usuário ainda não foi autorizado para acessar o painel web.',
+  })
+}
+
 export async function getWebAccessForUser(authUser) {
   if (!authUser?.id) {
     return {
@@ -31,6 +91,9 @@ export async function getWebAccessForUser(authUser) {
       reason: 'Sessão inválida.',
     }
   }
+
+  const rpcAccess = await getWebAccessByRpc(authUser)
+  if (rpcAccess) return rpcAccess
 
   const { data: perfil, error: perfilError } = await supabase
     .from('Perfis')
@@ -49,20 +112,26 @@ export async function getWebAccessForUser(authUser) {
     maybeGetSingle('Cidadao', 'cid_id', authUser.id),
   ])
 
-  const inferredRole = administrador
+  // O tipo salvo em Perfis é a fonte principal de autorização do painel web.
+  // As tabelas específicas antigas (Funcionario/Administrador/Instituicao) ficam como fallback.
+  // Isso evita o bug em que um usuário alterado para administrador continuava aparecendo
+  // como funcionário/sem perfil por causa de vínculo antigo em outra tabela.
+  const hasProfileRole = Boolean(perfil?.prf_tipo)
+  const profileRole = hasProfileRole ? normalizeRole(perfil.prf_tipo) : null
+
+  const fallbackRole = administrador
     ? 'admin'
     : funcionario
       ? 'employee'
       : instituicao
         ? 'institution'
-        : perfil?.prf_tipo
-          ? normalizeRole(perfil.prf_tipo)
-          : cidadao
-            ? 'citizen'
-            : 'unknown'
+        : cidadao
+          ? 'citizen'
+          : 'unknown'
 
-  const allowed = canAccessWeb(inferredRole) || Boolean(funcionario || administrador || instituicao)
-  const admin = canAccessAdmin(inferredRole) || Boolean(administrador)
+  const inferredRole = hasProfileRole ? profileRole : fallbackRole
+  const allowed = canAccessWeb(inferredRole) || (!hasProfileRole && Boolean(funcionario || administrador || instituicao))
+  const admin = canAccessAdmin(inferredRole) || (!hasProfileRole && Boolean(administrador))
 
   if (!allowed) {
     return {
@@ -78,6 +147,10 @@ export async function getWebAccessForUser(authUser) {
 
   const name = perfil?.prf_nome || authUser.email?.split('@')[0] || 'Usuário SMDN'
   const role = inferredRole
+  const permissions = {
+    ...(perfil?.prf_permissoes || {}),
+    admin,
+  }
 
   return {
     allowed: true,
@@ -92,7 +165,7 @@ export async function getWebAccessForUser(authUser) {
       roleLabel: getRoleLabel(role),
       isAdmin: admin,
       avatar: perfil?.prf_avatar_url || null,
-      permissions: perfil?.prf_permissoes || {},
+      permissions,
       perfil,
       funcionario,
       administrador,

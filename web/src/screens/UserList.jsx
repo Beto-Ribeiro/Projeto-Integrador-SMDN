@@ -48,6 +48,45 @@ function roleLabel(role) {
   return labels[normalized] || role || 'Sem tipo'
 }
 
+function normalizeProfileType(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function isAdminType(type) {
+  const normalizedType = normalizeProfileType(type)
+  return normalizedType === 'administrador' || normalizedType === 'admin'
+}
+
+function isBlockedWebType(type) {
+  const normalizedType = normalizeProfileType(type)
+  return ['pendente', 'sem perfil', 'semperfil', 'cidadao', 'cidada', 'citizen', 'unknown'].includes(normalizedType)
+}
+
+function allPermissions(value) {
+  return Object.keys(DEFAULT_PERMISSIONS).reduce((acc, key) => ({ ...acc, [key]: value }), {})
+}
+
+function permissionsForType(permissions, type) {
+  const base = { ...DEFAULT_PERMISSIONS, ...(permissions || {}) }
+
+  if (isBlockedWebType(type)) {
+    return allPermissions(false)
+  }
+
+  if (isAdminType(type)) {
+    return allPermissions(true)
+  }
+
+  return {
+    ...base,
+    admin: false,
+  }
+}
+
 function makeForm(user) {
   return {
     name: user?.prf_nome || '',
@@ -55,7 +94,7 @@ function makeForm(user) {
     email: user?.prf_email_contato || '',
     phone: formatBrazilPhone(user?.prf_telefone || ''),
     avatarUrl: user?.prf_avatar_url || '',
-    permissions: { ...DEFAULT_PERMISSIONS, ...(user?.prf_permissoes || {}) },
+    permissions: permissionsForType(user?.prf_permissoes, user?.prf_tipo),
   }
 }
 
@@ -80,7 +119,7 @@ function Avatar({ user, size = 'lg' }) {
 }
 
 export default function UserList() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, refreshUser } = useAuth()
   const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
@@ -168,14 +207,30 @@ export default function UserList() {
     }
   }
 
-  function togglePermission(permissionKey) {
+  function handleTypeChange(nextType) {
     setForm((current) => ({
       ...current,
-      permissions: {
-        ...current.permissions,
-        [permissionKey]: !current.permissions?.[permissionKey],
-      },
+      type: nextType,
+      permissions: permissionsForType(current.permissions, nextType),
     }))
+  }
+
+  function togglePermission(permissionKey) {
+    setForm((current) => {
+      if (isBlockedWebType(current.type)) return current
+      if (permissionKey === 'admin' && !isAdminType(current.type)) return current
+
+      return {
+        ...current,
+        permissions: permissionsForType(
+          {
+            ...current.permissions,
+            [permissionKey]: !current.permissions?.[permissionKey],
+          },
+          current.type
+        ),
+      }
+    })
   }
 
   async function handleSave() {
@@ -187,6 +242,11 @@ export default function UserList() {
 
     try {
       await updateUserProfileByAdmin({ user: selectedUser, form, actorUser: currentUser })
+
+      if (selectedUser.prf_id === currentUser?.id) {
+        await refreshUser()
+      }
+
       setMessage('Perfil do usuário atualizado. A atividade aparecerá no perfil dele.')
       await loadSelectedActivities(selectedUser.prf_id)
       closeEdit()
@@ -275,7 +335,7 @@ export default function UserList() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2"><label className="block text-label text-slate-600 mb-1.5">NOME COMPLETO</label><input className="input-field" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></div>
-            <div><label className="block text-label text-slate-600 mb-1.5">TIPO DE PERFIL</label><select className="input-field" value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}><option value="pendente">Sem perfil</option><option value="funcionario">Funcionário</option><option value="instituicao">Instituição</option><option value="cidadao">Cidadão</option><option value="administrador">Administrador</option></select></div>
+            <div><label className="block text-label text-slate-600 mb-1.5">TIPO DE PERFIL</label><select className="input-field" value={form.type} onChange={(event) => handleTypeChange(event.target.value)}><option value="pendente">Sem perfil</option><option value="funcionario">Funcionário</option><option value="instituicao">Instituição</option><option value="cidadao">Cidadão</option><option value="administrador">Administrador</option></select></div>
             <div><label className="block text-label text-slate-600 mb-1.5">E-MAIL DE CONTATO</label><input type="email" className="input-field" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></div>
             <div><label className="block text-label text-slate-600 mb-1.5">TELEFONE</label><input className="input-field" inputMode="numeric" maxLength={15} value={form.phone} placeholder="(12) 98703-7110" onChange={(event) => setForm((current) => ({ ...current, phone: formatBrazilPhone(event.target.value) }))} /></div>
             <div><label className="block text-label text-slate-600 mb-1.5">FOTO DO PERFIL</label><label className="input-field flex items-center justify-between cursor-pointer text-slate-500"><span className="truncate">{uploadingAvatar ? 'Enviando foto...' : form.avatarUrl ? 'Trocar foto' : 'Enviar foto'}</span><input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar} onChange={handleAvatarFileChange} /></label></div>
@@ -284,13 +344,26 @@ export default function UserList() {
 
           <div className="rounded-2xl border border-border-soft p-4">
             <h3 className="font-bold text-slate-800 mb-3">Permissões do usuário</h3>
+            <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+              Sem perfil e Cidadão não acessam o painel web. Funcionário e Instituição acessam o sistema, mas não acessam Administração. Administrador acessa tudo.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
-                <label key={key} className="flex items-center gap-2 text-sm text-slate-600">
-                  <input type="checkbox" checked={Boolean(form.permissions?.[key])} onChange={() => togglePermission(key)} />
-                  {label}
-                </label>
-              ))}
+              {Object.entries(PERMISSION_LABELS).map(([key, label]) => {
+                const blockedType = isBlockedWebType(form.type)
+                const disabled = blockedType || (key === 'admin' && !isAdminType(form.type))
+
+                return (
+                  <label key={key} className={`flex items-center gap-2 text-sm ${disabled ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.permissions?.[key])}
+                      disabled={disabled}
+                      onChange={() => togglePermission(key)}
+                    />
+                    {label}
+                  </label>
+                )
+              })}
             </div>
           </div>
 

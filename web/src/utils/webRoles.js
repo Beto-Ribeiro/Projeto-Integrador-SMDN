@@ -1,6 +1,6 @@
 const ROLE_LABELS = {
   admin: 'Administrador',
-  employee: 'Agente autorizado',
+  employee: 'Funcionário',
   institution: 'Instituição',
   citizen: 'Cidadão',
   unknown: 'Sem perfil web',
@@ -53,10 +53,15 @@ export function getRoleLabel(role) {
   return ROLE_LABELS[normalizeRole(role)] || ROLE_LABELS.unknown
 }
 
+// Regra do SMDN:
+// - Sem perfil e Cidadão não acessam o painel web.
+// - Funcionário, Instituição e Administrador acessam o sistema web.
 export function canAccessWeb(role) {
   return ['admin', 'employee', 'institution'].includes(normalizeRole(role))
 }
 
+// Só Administrador abre Administração/Painel do Admin/Lista de Usuários.
+// A permissão "admin" do JSON não deve liberar esse acesso sozinha.
 export function canAccessAdmin(role) {
   return normalizeRole(role) === 'admin'
 }

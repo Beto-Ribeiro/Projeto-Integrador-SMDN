@@ -120,6 +120,15 @@ export const AuthProvider = ({ children }) => {
     setAccessError('')
   }
 
+  async function refreshUser() {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) throw error
+
+    return applySession(data?.session ?? session, {
+      signOutWhenUnauthorized: false,
+    })
+  }
+
   const value = useMemo(
     () => ({
       session,
@@ -131,6 +140,7 @@ export const AuthProvider = ({ children }) => {
       isAdmin: Boolean(user?.isAdmin || user?.role === 'admin'),
       signIn,
       signOut,
+      refreshUser,
     }),
     [session, user, loading, accessError]
   )

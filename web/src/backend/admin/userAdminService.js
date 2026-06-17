@@ -44,8 +44,85 @@ async function getProfileName(userId) {
   return data?.prf_nome || 'Administrador'
 }
 
+function normalizeProfileType(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function isAdminType(value) {
+  const normalizedType = normalizeProfileType(value)
+  return normalizedType === 'administrador' || normalizedType === 'admin'
+}
+
+function isBlockedWebType(value) {
+  const normalizedType = normalizeProfileType(value)
+  return ['pendente', 'sem perfil', 'semperfil', 'cidadao', 'cidada', 'citizen', 'unknown'].includes(normalizedType)
+}
+
 function permissionsWithDefaults(value) {
   return { ...DEFAULT_PERMISSIONS, ...(value || {}) }
+}
+
+function permissionsForRole(value, profileType) {
+  const permissions = permissionsWithDefaults(value)
+
+  if (isBlockedWebType(profileType)) {
+    return Object.keys(DEFAULT_PERMISSIONS).reduce((acc, key) => ({ ...acc, [key]: false }), {})
+  }
+
+  if (isAdminType(profileType)) {
+    return Object.keys(DEFAULT_PERMISSIONS).reduce((acc, key) => ({ ...acc, [key]: true }), {})
+  }
+
+  return {
+    ...permissions,
+    admin: false,
+  }
+}
+
+function makeAdminAlias(name, fallbackId) {
+  const base = normalize(name)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return `${base || String(fallbackId || 'admin').slice(0, 8)}-admin`
+}
+
+async function syncAdministratorBinding({ userId, profileType, name }) {
+  const normalizedType = normalizeProfileType(profileType)
+
+  if (normalizedType === 'administrador' || normalizedType === 'admin') {
+    const { error } = await supabase
+      .from('Administrador')
+      .upsert(
+        {
+          adm_id: userId,
+          adm_apelido: makeAdminAlias(name, userId),
+        },
+        { onConflict: 'adm_id' }
+      )
+
+    if (error && !isMissingRelationError(error)) {
+      throw error
+    }
+
+    return
+  }
+
+  const { error } = await supabase
+    .from('Administrador')
+    .delete()
+    .eq('adm_id', userId)
+
+  if (error && !isMissingRelationError(error)) {
+    throw error
+  }
 }
 
 function makeChange(key, label, oldValue, newValue) {
@@ -116,7 +193,7 @@ export async function updateUserProfileByAdmin({ user, form, actorUser }) {
     prf_email_contato: normalize(form.email).toLowerCase() || null,
     prf_telefone: formatBrazilPhone(form.phone) || null,
     prf_avatar_url: normalize(form.avatarUrl) || null,
-    prf_permissoes: permissionsWithDefaults(form.permissions),
+    prf_permissoes: permissionsForRole(form.permissions, form.type),
   }
 
   const before = {
@@ -136,6 +213,12 @@ export async function updateUserProfileByAdmin({ user, form, actorUser }) {
     .single()
 
   if (error) throw error
+
+  await syncAdministratorBinding({
+    userId: user.prf_id,
+    profileType: data.prf_tipo,
+    name: data.prf_nome,
+  })
 
   const changes = buildChanges(before, data)
   const detail = actorUserId === user.prf_id

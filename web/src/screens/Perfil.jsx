@@ -109,7 +109,7 @@ export default function Perfil() {
 
   useEffect(() => {
     setForm(makeInitialForm(user))
-  }, [user?.id])
+  }, [user])
 
   useEffect(() => {
     let mounted = true
@@ -142,7 +142,7 @@ export default function Perfil() {
 
     return PERMISSIONS.map((permission) => ({
       ...permission,
-      granted: isAdmin ? true : Boolean(storedPermissions[permission.key]),
+      granted: permission.key === 'admin' ? isAdmin : (isAdmin ? true : Boolean(storedPermissions[permission.key])),
     }))
   }, [isAdmin, user?.permissions, user?.perfil?.prf_permissoes])
 
