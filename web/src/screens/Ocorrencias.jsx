@@ -1,15 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
-
-const ALL_OCORRENCIAS = [
-  { id: 'OC-001', type: 'Enchente', city: 'São José dos Campos', neighborhood: 'Jardim Aquarius', severity: 'critical', status: 'active', reportedAt: '2025-01-10T08:10:00', description: 'Rua inundada, famílias precisam de evacuação.' },
-  { id: 'OC-002', type: 'Deslizamento', city: 'Caraguatatuba', neighborhood: 'Pegorelli', severity: 'severe', status: 'active', reportedAt: '2025-01-10T07:35:00', description: 'Talude instável após 80mm de chuva.' },
-  { id: 'OC-004', type: 'Incêndio', city: 'Jacareí', neighborhood: 'Vila Industrial', severity: 'severe', status: 'active', reportedAt: '2025-01-09T22:00:00', description: 'Incêndio em vegetação, vento forte dispersando chamas.' },
-  { id: 'OC-005', type: 'Temporal', city: 'Guaratinguetá', neighborhood: 'Santa Luzia', severity: 'regular', status: 'monitoring', reportedAt: '2025-01-09T20:45:00', description: 'Acumulado de chuva dentro do previsto, vias transitáveis.' },
-  { id: 'OC-006', type: 'Desabamento', city: 'Pindamonhangaba', neighborhood: 'Residencial Sul', severity: 'critical', status: 'resolved', reportedAt: '2025-01-09T18:00:00', description: 'Muro residencial desabou, sem vítimas.' },
-  { id: 'OC-007', type: 'Enchente', city: 'Taubaté', neighborhood: 'Bom Retiro', severity: 'severe', status: 'monitoring', reportedAt: '2025-01-09T15:30:00', description: 'Nível do córrego em elevação, monitorando.' },
-]
+import {
+  formatOccurrenceDate,
+  getOcorrenciasData,
+  subscribeOcorrenciasChanges,
+  updateOcorrenciaStatus,
+} from '../services/ocorrenciasService.js'
 
 const SEVERITY_MAP = {
   critical: { label: 'Crítico', cls: 'badge-critical' },
@@ -23,9 +20,11 @@ const STATUS_MAP = {
   resolved: { label: 'Resolvida', dot: 'bg-status-success', cls: 'text-status-success bg-status-success-bg border-status-success/20' },
 }
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Ativa' },
+  { value: 'monitoring', label: 'Monitorando' },
+  { value: 'resolved', label: 'Resolvida' },
+]
 
 export default function Ocorrencias() {
   const [search, setSearch] = useState('')
@@ -33,168 +32,294 @@ export default function Ocorrencias() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCity, setFilterCity] = useState('all')
   const [selected, setSelected] = useState(null)
+  const [statusDraft, setStatusDraft] = useState('active')
+  const [savingStatus, setSavingStatus] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState({
+    stats: { active: 0, monitoring: 0, resolved: 0 },
+    items: [],
+  })
 
-  const cities = useMemo(() => [...new Set(ALL_OCORRENCIAS.map((o) => o.city))], [])
+  async function loadOcorrencias() {
+    try {
+      setError('')
+      const result = await getOcorrenciasData()
+      setData(result)
+    } catch (err) {
+      setError(err.message || 'Não foi possível carregar ocorrências.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadOcorrencias()
+    return subscribeOcorrenciasChanges(loadOcorrencias)
+  }, [])
+
+  useEffect(() => {
+    if (selected) {
+      setStatusDraft(selected.status || 'active')
+    }
+  }, [selected])
+
+  const cities = useMemo(() => {
+    return [...new Set(data.items.map((item) => item.city).filter(Boolean))]
+  }, [data.items])
 
   const filtered = useMemo(() => {
-    return ALL_OCORRENCIAS.filter((o) => {
-      if (filterSeverity !== 'all' && o.severity !== filterSeverity) return false
-      if (filterStatus !== 'all' && o.status !== filterStatus) return false
-      if (filterCity !== 'all' && o.city !== filterCity) return false
+    return data.items.filter((item) => {
+      if (filterSeverity !== 'all' && item.severity !== filterSeverity) return false
+      if (filterStatus !== 'all' && item.status !== filterStatus) return false
+      if (filterCity !== 'all' && item.city !== filterCity) return false
+
       if (search) {
         const q = search.toLowerCase()
-        if (!o.type.toLowerCase().includes(q) && !o.city.toLowerCase().includes(q) && !o.neighborhood.toLowerCase().includes(q) && !o.id.toLowerCase().includes(q)) return false
+        const haystack = [
+          item.id,
+          item.type,
+          item.city,
+          item.neighborhood,
+          item.riskLabel,
+          item.citizenName,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+
+        if (!haystack.includes(q)) return false
       }
+
       return true
     })
-  }, [search, filterSeverity, filterStatus, filterCity])
+  }, [data.items, filterSeverity, filterStatus, filterCity, search])
 
-  const stats = useMemo(() => ({
-    active: ALL_OCORRENCIAS.filter((o) => o.status === 'active').length,
-    monitoring: ALL_OCORRENCIAS.filter((o) => o.status === 'monitoring').length,
-    resolved: ALL_OCORRENCIAS.filter((o) => o.status === 'resolved').length,
-  }), [])
+  async function handleStatusUpdate() {
+    if (!selected) return
+
+    setSavingStatus(true)
+    setError('')
+    setNotice('')
+
+    try {
+      await updateOcorrenciaStatus({ relatoId: selected.relatoId, status: statusDraft })
+      await loadOcorrencias()
+      setSelected((current) => current ? { ...current, status: statusDraft } : current)
+      setNotice('Status da ocorrência atualizado.')
+      setTimeout(() => setNotice(''), 3500)
+    } catch (err) {
+      setError(err.message || 'Não foi possível atualizar o status.')
+    } finally {
+      setSavingStatus(false)
+    }
+  }
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+    <div className="p-8 space-y-6 animate-fade-in h-full overflow-hidden flex flex-col">
+      <div className="grid grid-cols-3 gap-4 flex-shrink-0">
         <Card className="flex items-center gap-4 py-4">
           <div className="w-10 h-10 rounded-xl bg-status-critical-bg flex items-center justify-center">
             <span className="w-3 h-3 rounded-full bg-status-critical animate-pulse2 block" />
           </div>
           <div>
             <p className="text-label text-slate-500">ATIVAS</p>
-            <p className="text-2xl font-bold text-status-critical">{stats.active}</p>
+            <p className="text-2xl font-bold text-status-critical">{data.stats.active}</p>
           </div>
         </Card>
+
         <Card className="flex items-center gap-4 py-4">
           <div className="w-10 h-10 rounded-xl bg-status-regular-bg flex items-center justify-center">
             <span className="w-3 h-3 rounded-full bg-status-regular block" />
           </div>
           <div>
             <p className="text-label text-slate-500">MONITORANDO</p>
-            <p className="text-2xl font-bold text-status-regular">{stats.monitoring}</p>
+            <p className="text-2xl font-bold text-status-regular">{data.stats.monitoring}</p>
           </div>
         </Card>
+
         <Card className="flex items-center gap-4 py-4">
           <div className="w-10 h-10 rounded-xl bg-status-success-bg flex items-center justify-center">
             <span className="w-3 h-3 rounded-full bg-status-success block" />
           </div>
           <div>
             <p className="text-label text-slate-500">RESOLVIDAS</p>
-            <p className="text-2xl font-bold text-status-success">{stats.resolved}</p>
+            <p className="text-2xl font-bold text-status-success">{data.stats.resolved}</p>
           </div>
         </Card>
       </div>
 
-      {/* Table Card */}
-      <Card className="p-0 overflow-hidden">
-        {/* Toolbar */}
-        <div className="px-6 py-4 border-b border-border-soft flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M10.5 10.5L13.5 13.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-            <input
-              className="input-field pl-9"
-              placeholder="Buscar por tipo, município, bairro..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+      {notice && (
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700 flex-shrink-0">
+          {notice}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 flex-shrink-0">
+          {error}
+        </div>
+      )}
+
+      <Card className="p-0 overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="px-6 py-4 border-b border-border-soft overflow-x-auto flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-[920px]">
+            <div className="relative flex-1 min-w-0">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M10.5 10.5L13.5 13.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              <input
+                className="input-field pl-9 w-full"
+                placeholder="Buscar por tipo, município, cidadão, nível..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
+
+            <select className="select-field w-[150px] flex-shrink-0" value={filterSeverity} onChange={(event) => setFilterSeverity(event.target.value)}>
+              <option value="all">Toda Severidade</option>
+              <option value="critical">Crítico</option>
+              <option value="severe">Grave</option>
+              <option value="regular">Moderado</option>
+            </select>
+
+            <select className="select-field w-[135px] flex-shrink-0" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
+              <option value="all">Todo Status</option>
+              <option value="active">Ativa</option>
+              <option value="monitoring">Monitorando</option>
+              <option value="resolved">Resolvida</option>
+            </select>
+
+            <select className="select-field w-[170px] flex-shrink-0" value={filterCity} onChange={(event) => setFilterCity(event.target.value)}>
+              <option value="all">Todos Municípios</option>
+              {cities.map((city) => <option key={city}>{city}</option>)}
+            </select>
+
+            <span className="text-xs text-slate-400 whitespace-nowrap flex-shrink-0">
+              {loading ? 'Carregando...' : `${filtered.length} resultado(s)`}
+            </span>
           </div>
-          <select className="select-field w-auto" value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)}>
-            <option value="all">Toda Severidade</option>
-            <option value="critical">Crítico</option>
-            <option value="severe">Grave</option>
-            <option value="regular">Moderado</option>
-          </select>
-          <select className="select-field w-auto" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">Todo Status</option>
-            <option value="active">Ativa</option>
-            <option value="monitoring">Monitorando</option>
-            <option value="resolved">Resolvida</option>
-          </select>
-          <select className="select-field w-auto" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
-            <option value="all">Todos Municípios</option>
-            {cities.map((c) => <option key={c}>{c}</option>)}
-          </select>
-          <span className="text-xs text-slate-400 ml-auto">{filtered.length} resultado(s)</span>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-auto flex-1 min-h-0">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="border-b border-border-soft bg-slate-50">
-                {['ID', 'Tipo', 'Município / Bairro', 'Severidade', 'Status', 'Data', ''].map((h) => (
-                  <th key={h} className="px-5 py-3 text-left text-label text-slate-500 font-bold whitespace-nowrap">{h}</th>
+                {['ID', 'Tipo', 'Município / Bairro', 'Severidade', 'Status', 'Data', ''].map((heading) => (
+                  <th key={heading} className="px-5 py-3 text-left text-label text-slate-500 font-bold whitespace-nowrap">
+                    {heading}
+                  </th>
                 ))}
               </tr>
             </thead>
+
             <tbody>
-              {filtered.length === 0 ? (
+              {filtered.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-slate-400 text-sm">Nenhuma ocorrência encontrada.</td>
+                  <td colSpan={7} className="px-5 py-10 text-center text-slate-400 text-sm">
+                    Nenhuma ocorrência encontrada.
+                  </td>
                 </tr>
               ) : (
-                filtered.map((o) => (
-                  <tr key={o.id} className="border-b border-border-soft hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3 font-mono text-xs text-slate-500">{o.id}</td>
-                    <td className="px-5 py-3 font-semibold text-slate-800">{o.type}</td>
-                    <td className="px-5 py-3">
-                      <span className="text-slate-700">{o.city}</span>
-                      <span className="text-slate-400 text-xs block">{o.neighborhood}</span>
-                    </td>
-                    <td className="px-5 py-3"><span className={SEVERITY_MAP[o.severity].cls}>{SEVERITY_MAP[o.severity].label}</span></td>
-                    <td className="px-5 py-3">
-                      <span className={`inline-flex items-center gap-1.5 border text-xs font-bold px-2.5 py-0.5 rounded-badge ${STATUS_MAP[o.status].cls}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_MAP[o.status].dot}`} />
-                        {STATUS_MAP[o.status].label}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(o.reportedAt)}</td>
-                    <td className="px-5 py-3">
-                      <button
-                        onClick={() => setSelected(o)}
-                        className="text-text-main text-xs font-semibold hover:underline"
-                      >
-                        Ver detalhes
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                filtered.map((item) => {
+                  const severity = SEVERITY_MAP[item.severity] || SEVERITY_MAP.regular
+                  const status = STATUS_MAP[item.status] || STATUS_MAP.active
+
+                  return (
+                    <tr key={item.relatoId} className="border-b border-border-soft hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3 font-mono text-xs text-slate-500">{item.id}</td>
+                      <td className="px-5 py-3 font-semibold text-slate-800">{item.type}</td>
+                      <td className="px-5 py-3">
+                        <span className="text-slate-700">{item.city}</span>
+                        <span className="text-slate-400 text-xs block">{item.neighborhood}</span>
+                      </td>
+                      <td className="px-5 py-3"><span className={severity.cls}>{severity.label}</span></td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex items-center gap-1.5 border text-xs font-bold px-2.5 py-0.5 rounded-badge ${status.cls}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-slate-500 text-xs whitespace-nowrap">{formatOccurrenceDate(item.reportedAt)}</td>
+                      <td className="px-5 py-3">
+                        <button
+                          onClick={() => setSelected(item)}
+                          className="text-text-main text-xs font-semibold hover:underline"
+                        >
+                          Ver detalhes
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {/* Detail Modal */}
-      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={`Ocorrência ${selected?.id}`} size="md">
+      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={`Ocorrência ${selected?.id || ''}`} size="md">
         {selected && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-lg text-slate-800">{selected.type}</span>
-              <span className={SEVERITY_MAP[selected.severity].cls}>{SEVERITY_MAP[selected.severity].label}</span>
-              <span className={`inline-flex items-center gap-1.5 border text-xs font-bold px-2.5 py-0.5 rounded-badge ${STATUS_MAP[selected.status].cls}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_MAP[selected.status].dot}`} />
-                {STATUS_MAP[selected.status].label}
+              <span className={SEVERITY_MAP[selected.severity]?.cls || SEVERITY_MAP.regular.cls}>
+                {SEVERITY_MAP[selected.severity]?.label || 'Moderado'}
+              </span>
+              <span className={`inline-flex items-center gap-1.5 border text-xs font-bold px-2.5 py-0.5 rounded-badge ${(STATUS_MAP[selected.status] || STATUS_MAP.active).cls}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${(STATUS_MAP[selected.status] || STATUS_MAP.active).dot}`} />
+                {(STATUS_MAP[selected.status] || STATUS_MAP.active).label}
               </span>
             </div>
+
+            {selected.photoUrl && (
+              <img
+                src={selected.photoUrl}
+                alt="Foto da ocorrência"
+                className="w-full max-h-64 object-cover rounded-xl border border-border-soft"
+              />
+            )}
+
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div><dt className="text-label text-slate-400">MUNICÍPIO</dt><dd className="text-slate-700 font-medium mt-0.5">{selected.city}</dd></div>
               <div><dt className="text-label text-slate-400">BAIRRO</dt><dd className="text-slate-700 font-medium mt-0.5">{selected.neighborhood}</dd></div>
-              <div><dt className="text-label text-slate-400">DATA DE REGISTRO</dt><dd className="text-slate-700 font-medium mt-0.5">{formatDate(selected.reportedAt)}</dd></div>
+              <div><dt className="text-label text-slate-400">DATA DE REGISTRO</dt><dd className="text-slate-700 font-medium mt-0.5">{formatOccurrenceDate(selected.reportedAt)}</dd></div>
+              <div><dt className="text-label text-slate-400">CIDADÃO</dt><dd className="text-slate-700 font-medium mt-0.5">{selected.citizenName}</dd></div>
+              <div><dt className="text-label text-slate-400">NÍVEL INFORMADO</dt><dd className="text-slate-700 font-medium mt-0.5">{selected.riskLabel}</dd></div>
+              <div><dt className="text-label text-slate-400">LOCALIZAÇÃO</dt><dd className="text-slate-700 font-medium mt-0.5">{Number.isFinite(selected.lat) && Number.isFinite(selected.lng) ? `${selected.lat.toFixed(5)}, ${selected.lng.toFixed(5)}` : 'Não informada'}</dd></div>
             </dl>
+
             <div>
               <p className="text-label text-slate-400 mb-1">DESCRIÇÃO</p>
               <p className="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 border border-border-soft">{selected.description}</p>
             </div>
+
+            <div className="rounded-xl border border-border-soft bg-slate-50 p-3">
+              <label className="block text-label text-slate-500 mb-1.5">ATUALIZAR STATUS</label>
+              <div className="flex gap-3">
+                <select
+                  className="select-field flex-1"
+                  value={statusDraft}
+                  onChange={(event) => setStatusDraft(event.target.value)}
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <button
+                  className="btn-primary"
+                  disabled={savingStatus}
+                  onClick={handleStatusUpdate}
+                >
+                  {savingStatus ? 'Salvando...' : 'Salvar Status'}
+                </button>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 pt-2 border-t border-border-soft">
               <button className="btn-ghost" onClick={() => setSelected(null)}>Fechar</button>
-              <button className="btn-primary">Atualizar Status</button>
             </div>
           </div>
         )}
