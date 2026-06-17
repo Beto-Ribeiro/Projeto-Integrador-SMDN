@@ -48,8 +48,13 @@ const MapView = forwardRef(function MapView(
       attributionControl: true,
     }).setView([-23.5505, -46.6333], 10)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+    // O prefixo "Leaflet" pode ser removido pelo próprio Leaflet.
+    // Mantemos a atribuição do OpenStreetMap, só mais discreta, para cumprir uso dos tiles.
+    mapInstanceRef.current.attributionControl.setPrefix(false)
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      crossOrigin: true,
     }).addTo(mapInstanceRef.current)
 
     if (!mapInstanceRef.current.getPane('smdnHeatPane')) {
@@ -71,6 +76,54 @@ const MapView = forwardRef(function MapView(
       const style = document.createElement('style')
       style.id = 'smdn-heatmap-style'
       style.textContent = `
+        .smdn-map-root,
+        .smdn-map-root .leaflet-container {
+          width: 100%;
+          height: 100%;
+          background: #dbe6ed;
+          outline: none;
+        }
+
+        .smdn-map-root .leaflet-control-attribution {
+          right: 8px;
+          bottom: 8px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.58);
+          backdrop-filter: blur(8px);
+          padding: 2px 7px;
+          color: #64748b;
+          font-size: 9px;
+          line-height: 1.25;
+          box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+          opacity: 0.62;
+          transition: opacity 0.2s ease, background 0.2s ease;
+        }
+
+        .smdn-map-root .leaflet-control-attribution:hover,
+        .smdn-map-root .leaflet-control-attribution:focus-within {
+          opacity: 1;
+          background: rgba(255, 255, 255, 0.92);
+        }
+
+        .smdn-map-root .leaflet-control-attribution a {
+          color: #475569;
+          text-decoration: none;
+        }
+
+        .smdn-map-root .leaflet-control-zoom {
+          border: 0;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .smdn-map-root .leaflet-control-zoom a {
+          border: 0;
+          color: #09162e;
+        }
+
+        .smdn-map-root .leaflet-control-zoom a:first-child {
+          border-bottom: 1px solid #e2e8f0;
+        }
+
         .smdn-heat-circle {
           mix-blend-mode: multiply;
           filter: blur(1px);
@@ -212,7 +265,7 @@ const MapView = forwardRef(function MapView(
     }
   }
 
-  return <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+  return <div ref={mapRef} className="smdn-map-root" />
 })
 
 export default MapView

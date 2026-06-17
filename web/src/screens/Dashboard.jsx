@@ -118,7 +118,7 @@ export default function Dashboard() {
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-100 p-4 animate-fade-in">
-      <Card className="absolute inset-4 !p-0 overflow-hidden border border-slate-200 shadow-sm z-0">
+      <Card className="absolute inset-4 !p-0 overflow-hidden !border-0 !shadow-none !rounded-[22px] z-0 bg-transparent">
         <MapView ref={mapRef} ocorrencias={mapOccurrences} heatmap={mapMode === 'heat'} />
 
         <div className="absolute top-4 left-16 z-[500] flex rounded-xl bg-white/90 backdrop-blur-sm border border-border-soft shadow-sm overflow-hidden">
