@@ -121,7 +121,7 @@ export default function Dashboard() {
       <Card className="absolute inset-4 !p-0 overflow-hidden border border-slate-200 shadow-sm z-0">
         <MapView ref={mapRef} ocorrencias={mapOccurrences} heatmap={mapMode === 'heat'} />
 
-        <div className="absolute top-4 left-4 z-[500] flex rounded-xl bg-white/90 backdrop-blur-sm border border-border-soft shadow-sm overflow-hidden">
+        <div className="absolute top-4 left-16 z-[500] flex rounded-xl bg-white/90 backdrop-blur-sm border border-border-soft shadow-sm overflow-hidden">
           <button
             className={`px-3 py-2 text-xs font-bold transition-colors ${mapMode === 'heat' ? 'bg-text-main text-white' : 'text-slate-600 hover:bg-slate-50'}`}
             onClick={() => setMapMode('heat')}
@@ -134,15 +134,6 @@ export default function Dashboard() {
           >
             Pontos
           </button>
-        </div>
-
-        <div className="absolute bottom-4 left-4 z-[500] rounded-xl bg-white/90 backdrop-blur-sm border border-border-soft shadow-sm px-3 py-2 text-xs text-slate-600">
-          <p className="font-bold text-slate-700 mb-1">Intensidade</p>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-status-critical" /> Crítico</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-status-severe" /> Grave</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-status-regular" /> Moderado</span>
-          </div>
         </div>
       </Card>
 

@@ -10,9 +10,9 @@ L.Icon.Default.mergeOptions({
 })
 
 const SEVERITY_STYLE = {
-  Crítico: { color: '#c60202', radius: 3800, opacity: 0.26 },
-  Grave: { color: '#ff6a00', radius: 2700, opacity: 0.22 },
-  Moderado: { color: '#cab900', radius: 1800, opacity: 0.18 },
+  Crítico: { color: '#c60202', radius: 2200, opacity: 0.11 },
+  Grave: { color: '#ff6a00', radius: 1550, opacity: 0.09 },
+  Moderado: { color: '#cab900', radius: 1050, opacity: 0.075 },
 }
 
 function getSeverityStyle(severidade) {
@@ -52,6 +52,12 @@ const MapView = forwardRef(function MapView(
       attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstanceRef.current)
 
+    if (!mapInstanceRef.current.getPane('smdnHeatPane')) {
+      mapInstanceRef.current.createPane('smdnHeatPane')
+      mapInstanceRef.current.getPane('smdnHeatPane').style.zIndex = 350
+      mapInstanceRef.current.getPane('smdnHeatPane').style.pointerEvents = 'none'
+    }
+
     occurrenceLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current)
     heatLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current)
 
@@ -60,6 +66,18 @@ const MapView = forwardRef(function MapView(
       placeSelectionMarker(lat, lng)
       if (onMapClick) onMapClick(lat, lng)
     })
+
+    if (!document.getElementById('smdn-heatmap-style')) {
+      const style = document.createElement('style')
+      style.id = 'smdn-heatmap-style'
+      style.textContent = `
+        .smdn-heat-circle {
+          mix-blend-mode: multiply;
+          filter: blur(1px);
+        }
+      `
+      document.head.appendChild(style)
+    }
 
     setTimeout(() => mapInstanceRef.current?.invalidateSize(), 200)
 
@@ -83,12 +101,13 @@ const MapView = forwardRef(function MapView(
 
       if (heatmap) {
         L.circle([item.lat, item.lng], {
+          pane: 'smdnHeatPane',
           radius: style.radius,
-          color: style.color,
+          stroke: false,
           fillColor: style.color,
           fillOpacity: style.opacity,
-          opacity: 0.35,
-          weight: 1,
+          interactive: false,
+          className: 'smdn-heat-circle',
         })
           .bindPopup(`<b>${item.titulo || 'Ocorrência'}</b><br/>Severidade: ${item.severidade || 'Moderado'}`)
           .addTo(heatLayerRef.current)
@@ -98,7 +117,7 @@ const MapView = forwardRef(function MapView(
           fillColor: style.color,
           color: '#fff',
           weight: 1.5,
-          fillOpacity: 0.95,
+          fillOpacity: 0.9,
         })
           .bindPopup(`<b>${item.titulo || 'Ocorrência'}</b><br/>Severidade: ${item.severidade || 'Moderado'}`)
           .addTo(heatLayerRef.current)
