@@ -218,15 +218,7 @@ export default function AdminPanel({ initialTab = 'all' }) {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-bg-sidebar/70">Administração</p>
-        <h1 className="text-3xl font-bold text-slate-800">Painel do Admin</h1>
-        <p className="text-sm text-slate-500 max-w-3xl">
-          Área restrita para revisar solicitações de acesso web, alterações de perfil e registros administrativos.
-        </p>
-      </div>
-
+    <div className="p-6 space-y-5">
       {missingSchema && (
         <div className="rounded-2xl border border-yellow-100 bg-yellow-50 px-5 py-4 text-sm text-yellow-800 leading-relaxed">
           O front do painel já está pronto, mas uma ou mais tabelas administrativas ainda não existem no Supabase.

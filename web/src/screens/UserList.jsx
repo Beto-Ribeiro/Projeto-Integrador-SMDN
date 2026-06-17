@@ -220,15 +220,7 @@ export default function UserList() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-bg-sidebar/70">Administração</p>
-        <h1 className="text-3xl font-bold text-slate-800">Lista de Usuário</h1>
-        <p className="text-sm text-slate-500 max-w-3xl">
-          Consulte usuários, edite perfil, permissões e histórico administrativo do usuário.
-        </p>
-      </div>
-
+    <div className="p-6 space-y-5">
       {error && <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700 leading-relaxed">{error}</div>}
       {message && <div className="rounded-2xl border border-green-100 bg-green-50 px-5 py-4 text-sm text-green-700 leading-relaxed">{message}</div>}
 
