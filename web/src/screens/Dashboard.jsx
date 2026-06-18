@@ -3,9 +3,13 @@ import Card from '../components/Card'
 import Modal from '../components/Modal'
 import MapView from '../components/MapView'
 import Alert_triangle from '../assets/menu/inativo/alert-triangle.svg'
+import Alert_triangleLight from '../assets/menu/light/alert-triangle.svg'
 import Flag from '../assets/menu/inativo/flag.svg'
+import FlagLight from '../assets/menu/light/flag.svg'
 import Map_pin from '../assets/menu/inativo/map-pin.svg'
-import Check from '../assets/menu/inativo/map-pin.svg'
+import Map_pinLight from '../assets/menu/light/map-pin.svg'
+import Heart from '../assets/menu/inativo/heart.svg'
+import HeartLight from '../assets/menu/light/heart.svg'
 import {
   getDashboardData,
   subscribeDashboardChanges,
@@ -69,6 +73,8 @@ function formatFullDate(value) {
 
 export default function Dashboard() {
   const [selectedOcc, setSelectedOcc] = useState(null)
+  const [recentMinimized, setRecentMinimized] = useState(false)
+  const [statsMinimized, setStatsMinimized] = useState(false)
   const [dashboard, setDashboard] = useState({
     stats: {
       activeOccurrences: 0,
@@ -82,7 +88,7 @@ export default function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const { settings } = useSmdnSettings()
+  const { settings, effectiveTheme } = useSmdnSettings()
   const [mapMode, setMapMode] = useState(normalizeMapMode(settings.defaultMapMode))
   const mapRef = useRef(null)
 
@@ -98,7 +104,6 @@ export default function Dashboard() {
 
   const dashboardSummary = [
     { label: 'No mapa', value: mapOccurrences.length },
-    { label: 'Vítimas', value: mapVictims.length },
     { label: 'Críticos', value: dashboard.stats.criticalSeverity },
   ]
 
@@ -131,30 +136,32 @@ export default function Dashboard() {
     setSelectedOcc(occ)
   }
 
+  const useLightIcons = effectiveTheme === 'dark'
+
   const statCards = [
     {
       label: 'OCORRÊNCIAS ATIVAS',
       value: dashboard.stats.activeOccurrences,
       color: 'text-status-critical',
-      icon: Alert_triangle,
+      icon: useLightIcons ? Alert_triangleLight : Alert_triangle,
     },
     {
       label: 'ALERTAS ATIVOS',
       value: dashboard.stats.activeAlerts,
       color: 'text-status-severe',
-      icon: Flag,
+      icon: useLightIcons ? FlagLight : Flag,
     },
     {
       label: 'SEVERIDADE CRÍTICA',
       value: dashboard.stats.criticalSeverity,
       color: 'text-status-critical',
-      icon: Map_pin,
+      icon: useLightIcons ? Map_pinLight : Map_pin,
     },
     {
       label: 'RESOLVIDAS HOJE',
       value: dashboard.stats.resolvedToday,
       color: 'text-status-success',
-      icon: Check,
+      icon: useLightIcons ? HeartLight : Heart,
     },
   ]
 
@@ -196,101 +203,171 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-
-        {mapVictims.length > 0 && (
-          <div className="absolute top-16 left-16 z-[500] rounded-xl border border-border-soft bg-bg-surface/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-sm">
-            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-black align-middle ring-2 ring-white" />
-            {mapMode === 'victims' ? 'Exibindo somente vítimas' : `${mapVictims.length} vítima(s) no mapa`}
-          </div>
-        )}
       </Card>
 
-      <Card className="absolute top-8 right-8 w-80 max-h-[430px] shadow-xl border border-border-soft bg-bg-surface/95 backdrop-blur-sm p-0 overflow-hidden flex flex-col z-10">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-800">Ocorrências Recentes</h3>
-            <p className="text-[11px] text-slate-400">Relatos enviados pelo mobile</p>
-            <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Resumo rápido do dashboard">
-              {dashboardSummary.map((item) => (
-                <span
-                  key={item.label}
-                  className="rounded-full border border-border-soft bg-action-hover/10 px-2 py-0.5 text-[10px] font-bold text-slate-600"
-                >
-                  {item.label}: {item.value}
+      <div className="absolute top-8 right-8 z-10 flex w-80 flex-col items-end gap-3">
+        {recentMinimized ? (
+          <div className="flex items-center gap-2 self-end">
+            {mapVictims.length > 0 && (
+              <Card className="!rounded-xl border border-border-soft bg-bg-surface/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+                <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-black align-middle ring-2 ring-white" />
+                <span className="text-[11px] font-bold text-slate-700">
+                  {mapMode === 'victims' ? 'Somente vítimas' : `${mapVictims.length} vítima(s)`}
                 </span>
-              ))}
-            </div>
+              </Card>
+            )}
+
+            <Card
+              className="h-12 w-12 shadow-xl border border-border-soft bg-bg-surface/95 backdrop-blur-sm !p-0 overflow-hidden flex items-center justify-center transition-all duration-200"
+              role="region"
+              aria-label="Ocorrências recentes minimizadas"
+            >
+              <button
+                type="button"
+                onClick={() => setRecentMinimized(false)}
+                className="flex h-full w-full items-center justify-center text-lg font-black text-slate-700 hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+                aria-label="Expandir ocorrências recentes"
+                title="Expandir ocorrências recentes"
+              >
+                +
+              </button>
+            </Card>
           </div>
-          {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
-        </div>
-
-        {error && (
-          <div className="mx-4 mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 max-h-[360px]">
-          {dashboard.recentOccurrences.length === 0 && !loading ? (
-            <div className="px-4 py-8 text-center text-xs text-slate-400">
-              Nenhum relato encontrado ainda.
-            </div>
-          ) : (
-            dashboard.recentOccurrences.map((occ) => {
-              const cfg = SEVERITY_CONFIG[occ.severity] || SEVERITY_CONFIG.regular
-              return (
-                <button
-                  key={occ.id}
-                  type="button"
-                  onClick={() => handleOccClick(occ)}
-                  aria-label={`Abrir detalhes de ${occ.title}, severidade ${cfg.label}, ${occ.city}`}
-                  className="w-full flex items-start gap-2.5 px-4 py-3 hover:bg-slate-50/80 transition-colors text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-500"
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1"
-                    style={{ backgroundColor: cfg.dotColor }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-xs text-slate-800 truncate">{occ.title}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {occ.city} · {occ.time}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                      por {occ.citizenName}
-                    </p>
-                  </div>
-                  <span className={`${cfg.cls} text-[10px] px-1.5 py-0.5 rounded`}>
-                    {cfg.label}
-                  </span>
-                </button>
-              )
-            })
-          )}
-        </div>
-      </Card>
-
-      <div
-        className="absolute w-[80%] h-20 bottom-8 left-1/2 -translate-x-1/2 flex justify-between items-center gap-6 z-10 pointer-events-none"
-        role="list"
-        aria-label="Indicadores do dashboard"
-      >
-        {statCards.map((card) => (
+        ) : (
           <Card
-            key={card.label}
-            role="listitem"
-            aria-label={`${card.label}: ${card.value}`}
-            className="pointer-events-auto flex items-center gap-4 py-3 px-4 bg-bg-surface/95 backdrop-blur-sm shadow-lg border border-border-soft w-full h-full"
+            className="w-full max-h-[430px] shadow-xl border border-border-soft bg-bg-surface/95 backdrop-blur-sm p-0 overflow-hidden flex flex-col transition-all duration-200"
+            role="region"
+            aria-label="Ocorrências recentes"
           >
-            <div className="w-10 h-10 rounded-xl bg-action-hover/15 flex items-center justify-center flex-shrink-0">
-              <img src={card.icon} alt={card.label} className="w-[80%] h-[80%] object-contain" />
+            <div className="px-4 pt-4 pb-3 border-b border-slate-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold leading-tight text-slate-800">Ocorrências Recentes</h3>
+                  <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Resumo rápido do dashboard">
+                    {dashboardSummary.map((item) => (
+                      <span
+                        key={item.label}
+                        className="rounded-full border border-border-soft bg-action-hover/10 px-2 py-0.5 text-[10px] font-bold text-slate-600"
+                      >
+                        {item.label}: {item.value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
+                  <button
+                    type="button"
+                    onClick={() => setRecentMinimized(true)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-soft bg-bg-surface text-sm font-black text-slate-600 hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+                    aria-label="Minimizar ocorrências recentes"
+                    title="Minimizar"
+                  >
+                    −
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold text-slate-700 tracking-wider truncate">{card.label}</p>
-              <p className={`text-2xl font-black mt-0.5 ${card.color}`}>{card.value}</p>
+
+            {error && (
+              <div className="mx-4 mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 max-h-[360px]">
+              {dashboard.recentOccurrences.length === 0 && !loading ? (
+                <div className="px-4 py-8 text-center text-xs text-slate-400">
+                  Nenhum relato encontrado ainda.
+                </div>
+              ) : (
+                dashboard.recentOccurrences.map((occ) => {
+                  const cfg = SEVERITY_CONFIG[occ.severity] || SEVERITY_CONFIG.regular
+                  return (
+                    <button
+                      key={occ.id}
+                      type="button"
+                      onClick={() => handleOccClick(occ)}
+                      aria-label={`Abrir detalhes de ${occ.title}, severidade ${cfg.label}, ${occ.city}`}
+                      className="w-full flex items-start gap-2.5 px-4 py-3 hover:bg-slate-50/80 transition-colors text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-500"
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1"
+                        style={{ backgroundColor: cfg.dotColor }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-xs text-slate-800 truncate">{occ.title}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {occ.city} · {occ.time}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                          por {occ.citizenName}
+                        </p>
+                      </div>
+                      <span className={`${cfg.cls} text-[10px] px-1.5 py-0.5 rounded`}>
+                        {cfg.label}
+                      </span>
+                    </button>
+                  )
+                })
+              )}
             </div>
           </Card>
-        ))}
+        )}
+
+        {!recentMinimized && mapVictims.length > 0 && (
+          <Card className="self-start !rounded-xl border border-border-soft bg-bg-surface/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-black align-middle ring-2 ring-white" />
+            <span className="text-[11px] font-bold text-slate-700">
+              {mapMode === 'victims' ? 'Somente vítimas no mapa' : `${mapVictims.length} vítima(s) no mapa`}
+            </span>
+          </Card>
+        )}
       </div>
+
+      {statsMinimized ? (
+        <button
+          type="button"
+          onClick={() => setStatsMinimized(false)}
+          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-border-soft bg-bg-surface/95 px-4 py-3 text-xs font-bold text-slate-700 shadow-lg backdrop-blur-sm hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+          aria-label="Expandir indicadores do dashboard"
+        >
+          Mostrar indicadores · {dashboard.stats.activeOccurrences} ativas · {dashboard.stats.activeAlerts} alertas · {dashboard.stats.criticalSeverity} críticas
+        </button>
+      ) : (
+        <div
+          className="absolute w-[80%] h-20 bottom-8 left-1/2 -translate-x-1/2 flex justify-between items-center gap-6 z-10 pointer-events-none"
+          role="list"
+          aria-label="Indicadores do dashboard"
+        >
+          <button
+            type="button"
+            onClick={() => setStatsMinimized(true)}
+            className="absolute -top-10 right-0 pointer-events-auto rounded-xl border border-border-soft bg-bg-surface/95 px-3 py-2 text-[11px] font-bold text-slate-600 shadow-sm backdrop-blur-sm hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+            aria-label="Minimizar indicadores do dashboard"
+          >
+            Minimizar cards
+          </button>
+
+          {statCards.map((card) => (
+            <Card
+              key={card.label}
+              role="listitem"
+              aria-label={`${card.label}: ${card.value}`}
+              className="pointer-events-auto flex items-center gap-4 py-3 px-4 bg-bg-surface/95 backdrop-blur-sm shadow-lg border border-border-soft w-full h-full"
+            >
+              <div className="w-10 h-10 rounded-xl bg-action-hover/15 flex items-center justify-center flex-shrink-0">
+                <img src={card.icon} alt={card.label} className="w-[80%] h-[80%] object-contain" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-slate-700 tracking-wider truncate">{card.label}</p>
+                <p className={`text-2xl font-black mt-0.5 ${card.color}`}>{card.value}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Modal isOpen={!!selectedOcc} onClose={() => setSelectedOcc(null)} title="Detalhes da Ocorrência" size="md">
         {selectedOcc && (
