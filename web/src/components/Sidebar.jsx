@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import dashboardIcon from '../assets/menu/ativo/map-pin.svg'
 import dashboardIconWHITE from '../assets/menu/hover/map-pin.svg'
@@ -13,7 +13,11 @@ import auditoriaIconWHITE from '../assets/menu/hover/lock.svg'
 import perfilIcon from '../assets/menu/ativo/user.svg'
 import perfilIconWHITE from '../assets/menu/hover/user.svg'
 import logoutIcon from '../assets/menu/ativo/log-out.svg'
-import logoutIconWHITE from '../assets/menu/hover/log-out.svg'
+import logoClaro from '../assets/logo-claro.svg'
+import logoEscuro from '../assets/logo.svg'
+import SettingsPanel from './SettingsPanel.jsx'
+import AssistantWidget from './AssistantWidget.jsx'
+import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 
 function getLocalDevBypass() {
   const isLocalhost =
@@ -38,7 +42,6 @@ const NAV_ITEMS = [
   { id: 'ocorrencias', label: 'Ocorrências', icon: <img src={ocorrenciasIcon} width="20" height="20" alt="alert-triangle" />, iconWhite: <img src={ocorrenciasIconWHITE} width="20" height="20" alt="alert-triangle" /> },
   { id: 'relatorios', label: 'Relatórios', icon: <img src={relatoriosIcon} width="20" height="20" alt="pie-chart" />, iconWhite: <img src={relatoriosIconWHITE} width="20" height="20" alt="pie-chart" /> },
   { id: 'auditoria', label: 'Auditoria', icon: <img src={auditoriaIcon} width="20" height="20" alt="lock" />, iconWhite: <img src={auditoriaIconWHITE} width="20" height="20" alt="lock" /> },
-  { id: 'perfil', label: 'Perfil', icon: <img src={perfilIcon} width="20" height="20" alt="user" />, iconWhite: <img src={perfilIconWHITE} width="20" height="20" alt="user" /> },
 ]
 
 const ADMIN_ITEMS = [
@@ -85,9 +88,11 @@ function NavButton({ item, currentScreen, setCurrentScreen, hoveredItem, setHove
   return (
     <button
       key={item.id}
+      type="button"
       onClick={() => setCurrentScreen(item.id)}
       onMouseEnter={() => setHoveredItem(item.id)}
       onMouseLeave={() => setHoveredItem(null)}
+      aria-current={active ? 'page' : undefined}
       className={`
         w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150
         ${active ? 'bg-text-main text-white shadow-sm' : 'text-text-on-dark hover:bg-white/5 hover:text-white'}
@@ -101,6 +106,7 @@ function NavButton({ item, currentScreen, setCurrentScreen, hoveredItem, setHove
 
 export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
   const { user, isAdmin } = useAuth()
+  const { effectiveTheme } = useSmdnSettings()
   const { devBypassAuth, devBypassAdmin } = getLocalDevBypass()
   const showAdmin = isAdmin || devBypassAdmin
 
@@ -146,7 +152,11 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
         className="sidebar-scroll relative flex flex-col w-[220px] min-w-[220px] h-screen bg-bg-sidebar shadow-sidebar overflow-y-auto z-[10000]"
       >
         <div className="px-5 pt-6 pb-6 border-b border-white/5">
-          <img src="/src/assets/logo-claro.svg" alt="SMDN Logo" className="w-full max-w-[160px]" />
+          <img
+            src={effectiveTheme === 'light' ? logoEscuro : logoClaro}
+            alt="SMDN Logo"
+            className="w-full max-w-[160px]"
+          />
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5">
@@ -184,17 +194,20 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
         </nav>
 
         <div className="px-3 py-4 border-t border-white/5 space-y-2">
+          <AssistantWidget currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} />
+
           {displayUser && (
             <div className="relative">
               <button
                 ref={buttonRef}
+                type="button"
                 onClick={() => setShowProfilePopup((value) => !value)}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-all"
               >
                 <UserAvatar user={displayUser} />
 
                 <div className="min-w-0 text-left">
-                  <p className="text-white text-xs font-semibold truncate">
+                  <p className="text-text-on-dark text-xs font-semibold truncate">
                     {displayUser.name}
                   </p>
                   <p className="text-text-on-dark text-[10px] opacity-60 truncate">
@@ -211,13 +224,33 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
                   <div className="flex flex-col items-center">
                     <UserAvatar user={displayUser} size="lg" />
 
-                    <h3 className="mt-3 font-bold text-slate-800">
-                      {displayUser.name}
-                    </h3>
+                    <div className="mt-3 flex w-full items-start justify-between gap-3">
+                      <div className="min-w-0 text-center flex-1">
+                        <h3 className="font-bold text-slate-800 truncate">
+                          {displayUser.name}
+                        </h3>
 
-                    <p className="text-sm text-slate-500">
-                      {displayUser.roleLabel || displayUser.role}
-                    </p>
+                        <p className="text-sm text-slate-500 truncate">
+                          {displayUser.roleLabel || displayUser.role}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <SettingsPanel variant="icon" panelClassName="bottom-20" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowProfilePopup(false)
+                            setShowLogoutConfirm(true)
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"
+                          title="Sair"
+                          aria-label="Sair da conta"
+                        >
+                          <img src={logoutIcon} width="18" height="18" alt="" />
+                        </button>
+                      </div>
+                    </div>
 
                     <div className="w-full border-t mt-3 pt-3 text-sm text-slate-600 space-y-2">
                       <p>{displayUser.institution || displayUser.instituicao?.ins_numero || 'SMDN'}</p>
@@ -239,16 +272,6 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               )}
             </div>
           )}
-
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            onMouseEnter={() => setHoveredItem('logout')}
-            onMouseLeave={() => setHoveredItem(null)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all"
-          >
-            <img src={hoveredItem === 'logout' ? logoutIconWHITE : logoutIcon} width="20" height="20" alt="log-out" />
-            <span>Sair</span>
-          </button>
         </div>
       </aside>
 

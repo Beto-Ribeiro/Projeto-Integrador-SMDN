@@ -10,6 +10,7 @@ import {
   getDashboardData,
   subscribeDashboardChanges,
 } from '../backend/dashboard/dashboardService.js'
+import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 
 const SEVERITY_CONFIG = {
   critical: { label: 'Crítico', cls: 'badge-critical', dotColor: '#c60202' },
@@ -56,7 +57,8 @@ export default function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [mapMode, setMapMode] = useState('heat')
+  const { settings } = useSmdnSettings()
+  const [mapMode, setMapMode] = useState(settings.defaultMapMode || 'heat')
   const mapRef = useRef(null)
 
   const mapOccurrences = useMemo(
@@ -80,6 +82,10 @@ export default function Dashboard() {
     loadDashboard()
     return subscribeDashboardChanges(loadDashboard)
   }, [])
+  useEffect(() => {
+    setMapMode(settings.defaultMapMode || 'heat')
+  }, [settings.defaultMapMode])
+
 
   function handleOccClick(occ) {
     if (Number.isFinite(occ.lat) && Number.isFinite(occ.lng)) {

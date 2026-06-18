@@ -3,17 +3,80 @@
 @tailwind utilities;
 
 :root {
-  --bg-main: #e4e8eb;
-  --bg-sidebar: #09162e;
-  --bg-surface: #ffffff;
-  --text-main: #44769b;
-  --text-on-dark: #a6c1d4;
-  --action-inactive: #18395c;
-  --status-critical: #c60202;
-  --status-severe: #ff6a00;
-  --status-regular: #cab900;
-  --status-success: #02c602;
-  --border-soft: #d0dce6;
+  --bg-main: 228 232 235;
+  --bg-sidebar: 9 22 46;
+  --bg-surface: 255 255 255;
+  --text-main: 68 118 155;
+  --text-on-dark: 166 193 212;
+  --action-inactive: 24 57 92;
+  --action-hover: 45 90 135;
+  --status-critical: 198 2 2;
+  --status-severe: 255 106 0;
+  --status-regular: 202 185 0;
+  --status-success: 2 198 2;
+  --status-critical-bg: 255 240 240;
+  --status-severe-bg: 255 245 237;
+  --status-regular-bg: 255 251 224;
+  --status-success-bg: 240 255 240;
+  --border-soft: 208 220 230;
+  --sidebar-active: 37 99 235;
+}
+
+html[data-theme='light'] {
+  --bg-main: 241 245 249;
+  --bg-sidebar: 255 255 255;
+  --bg-surface: 255 255 255;
+  --text-main: 49 99 143;
+  --text-on-dark: 55 65 81;
+  --action-inactive: 226 232 240;
+  --action-hover: 219 234 254;
+  --border-soft: 203 213 225;
+}
+
+html[data-theme='dark'] {
+  --bg-main: 15 23 42;
+  --bg-sidebar: 2 6 23;
+  --bg-surface: 15 23 42;
+  --text-main: 125 179 219;
+  --text-on-dark: 203 213 225;
+  --action-inactive: 30 41 59;
+  --action-hover: 51 65 85;
+  --border-soft: 51 65 85;
+  --status-critical-bg: 69 10 10;
+  --status-severe-bg: 67 20 7;
+  --status-regular-bg: 66 32 6;
+  --status-success-bg: 5 46 22;
+}
+
+html[data-colorblind='true'] {
+  --status-critical: 0 92 171;
+  --status-severe: 217 95 2;
+  --status-regular: 117 112 179;
+  --status-success: 27 158 119;
+  --status-critical-bg: 232 243 255;
+  --status-severe-bg: 255 243 232;
+  --status-regular-bg: 241 239 255;
+  --status-success-bg: 232 250 244;
+}
+
+html[data-theme='dark'][data-colorblind='true'] {
+  --status-critical-bg: 7 31 53;
+  --status-severe-bg: 55 27 8;
+  --status-regular-bg: 34 31 65;
+  --status-success-bg: 8 45 35;
+}
+
+html[data-contrast='high'] {
+  --text-main: 0 95 160;
+  --border-soft: 71 85 105;
+}
+
+html[data-font-scale='large'] {
+  font-size: 106.25%;
+}
+
+html[data-font-scale='xlarge'] {
+  font-size: 112.5%;
 }
 
 * {
@@ -24,9 +87,102 @@ html, body {
   margin: 0;
   padding: 0;
   font-family: 'K2D', system-ui, sans-serif;
-  background-color: var(--bg-main);
+  background-color: rgb(var(--bg-main));
   color: #1e293b;
   -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-width: 1024px;
+}
+
+:focus-visible {
+  outline: 3px solid rgb(var(--text-main));
+  outline-offset: 2px;
+}
+
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.001ms !important;
+}
+
+html[data-density='compact'] .p-8 {
+  padding: 1.25rem !important;
+}
+
+html[data-density='compact'] .p-6 {
+  padding: 1rem !important;
+}
+
+html[data-density='compact'] .py-5 {
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+}
+
+html[data-theme='dark'] body {
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .bg-white,
+html[data-theme='dark'] .bg-bg-surface {
+  background-color: rgb(15 23 42) !important;
+}
+
+html[data-theme='dark'] .bg-slate-50,
+html[data-theme='dark'] .bg-slate-100 {
+  background-color: rgb(30 41 59) !important;
+}
+
+html[data-theme='dark'] .text-slate-900,
+html[data-theme='dark'] .text-slate-800,
+html[data-theme='dark'] .text-slate-700 {
+  color: rgb(226 232 240) !important;
+}
+
+html[data-theme='dark'] .text-slate-600,
+html[data-theme='dark'] .text-slate-500 {
+  color: rgb(203 213 225) !important;
+}
+
+html[data-theme='dark'] .text-slate-400 {
+  color: rgb(148 163 184) !important;
+}
+
+html[data-theme='dark'] .border-slate-100,
+html[data-theme='dark'] .border-slate-200,
+html[data-theme='dark'] .border-border-soft,
+html[data-theme='dark'] .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(51 65 85) !important;
+}
+
+html[data-theme='dark'] input,
+html[data-theme='dark'] textarea,
+html[data-theme='dark'] select {
+  background-color: rgb(15 23 42);
+  color: rgb(226 232 240);
+}
+
+html[data-theme='light'] .sidebar-scroll {
+  border-right: 1px solid rgb(var(--border-soft));
+}
+
+
+html[data-contrast='high'] .shadow-card,
+html[data-contrast='high'] .shadow-sm,
+html[data-contrast='high'] .shadow-lg,
+html[data-contrast='high'] .shadow-xl {
+  box-shadow: 0 0 0 2px rgb(var(--border-soft)) !important;
+}
+
+html[data-colorblind='true'] .badge-critical::before,
+html[data-colorblind='true'] .badge-severe::before,
+html[data-colorblind='true'] .badge-regular::before,
+html[data-colorblind='true'] .badge-success::before {
+  content: '● ';
 }
 
 /* Custom scrollbar */
@@ -75,4 +231,9 @@ html, body {
   .select-field {
     @apply w-full px-4 py-2.5 border border-border-soft rounded-lg text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-text-main/30 focus:border-text-main transition-colors cursor-pointer;
   }
+}
+
+html[data-theme='light'] .sidebar-scroll .hover\:text-white:hover {
+  color: rgb(15 23 42) !important;
+  background-color: rgb(241 245 249 / 0.85) !important;
 }
