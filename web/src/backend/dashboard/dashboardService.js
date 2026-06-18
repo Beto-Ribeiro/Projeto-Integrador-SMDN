@@ -43,6 +43,19 @@ async function getPhotoUrl(photoPath) {
   return data?.signedUrl || ''
 }
 
+function normalizeVictims(victims) {
+  return (victims || [])
+    .map((item) => ({
+      id: item.id || item.victimId || item.victim_id || `${item.lat}-${item.lng}`,
+      name: item.name || item.victimName || 'Vítima localizada',
+      lat: typeof item.lat === 'number' ? item.lat : item.lat ? Number(item.lat) : null,
+      lng: typeof item.lng === 'number' ? item.lng : item.lng ? Number(item.lng) : null,
+      source: item.source || 'relato',
+      updatedAt: item.updatedAt || item.updated_at || null,
+    }))
+    .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
+}
+
 async function withSignedPhotos(occurrences) {
   return Promise.all(
     (occurrences || []).map(async (item) => ({
@@ -70,8 +83,10 @@ export async function getDashboardData() {
       activeAlerts: Number(data?.stats?.activeAlerts || 0),
       criticalSeverity: Number(data?.stats?.criticalSeverity || 0),
       resolvedToday: Number(data?.stats?.resolvedToday || 0),
+      locatedVictims: Number(data?.stats?.locatedVictims || 0),
     },
     recentOccurrences,
+    victims: normalizeVictims(data?.victims || []),
   }
 }
 
@@ -80,7 +95,9 @@ export function subscribeDashboardChanges(onChange) {
     .channel('dashboard-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'Relato' }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'Foto' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'Ocorrencia_Status' }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'Alerta_Web' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_tokens' }, onChange)
     .subscribe()
 
   const intervalId = window.setInterval(onChange, 30000)

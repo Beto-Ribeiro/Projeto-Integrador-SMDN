@@ -163,6 +163,7 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
               options={[
                 { value: 'heat', label: 'Mapa de calor' },
                 { value: 'points', label: 'Pontos' },
+                { value: 'victims', label: 'Vítimas', description: 'Mostra apenas pontos de vítimas.' },
               ]}
             />
 

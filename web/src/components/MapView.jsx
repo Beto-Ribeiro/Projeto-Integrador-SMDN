@@ -23,16 +23,30 @@ function isValidCoord(value) {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
 const MapView = forwardRef(function MapView(
-  { ocorrencias = [], onMapClick, targetLocation, heatmap = false },
+  { ocorrencias = [], vitimas = [], onMapClick, targetLocation, heatmap = false, mapMode },
   ref
 ) {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const occurrenceLayerRef = useRef(null)
   const heatLayerRef = useRef(null)
+  const victimLayerRef = useRef(null)
   const selectionMarkerRef = useRef(null)
   const selectionRingRef = useRef(null)
+
+  const effectiveMode = mapMode || (heatmap ? 'heat' : 'points')
+  const showOccurrences = effectiveMode !== 'victims'
+  const showHeat = effectiveMode === 'heat'
 
   useImperativeHandle(ref, () => ({
     flyTo(lat, lng, zoom = 15) {
@@ -48,8 +62,6 @@ const MapView = forwardRef(function MapView(
       attributionControl: true,
     }).setView([-23.5505, -46.6333], 10)
 
-    // O prefixo "Leaflet" pode ser removido pelo próprio Leaflet.
-    // Mantemos a atribuição do OpenStreetMap, só mais discreta, para cumprir uso dos tiles.
     mapInstanceRef.current.attributionControl.setPrefix(false)
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -65,6 +77,7 @@ const MapView = forwardRef(function MapView(
 
     occurrenceLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current)
     heatLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current)
+    victimLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current)
 
     mapInstanceRef.current.on('click', (e) => {
       const { lat, lng } = e.latlng
@@ -120,6 +133,11 @@ const MapView = forwardRef(function MapView(
           color: #09162e;
         }
 
+        .smdn-map-root .leaflet-control-zoom a:focus-visible {
+          outline: 3px solid #0ea5e9;
+          outline-offset: 2px;
+        }
+
         .smdn-map-root .leaflet-control-zoom a:first-child {
           border-bottom: 1px solid #e2e8f0;
         }
@@ -127,6 +145,10 @@ const MapView = forwardRef(function MapView(
         .smdn-heat-circle {
           mix-blend-mode: multiply;
           filter: blur(1px);
+        }
+
+        .smdn-victim-marker {
+          filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.35));
         }
       `
       document.head.appendChild(style)
@@ -142,56 +164,82 @@ const MapView = forwardRef(function MapView(
 
   useEffect(() => {
     const map = mapInstanceRef.current
-    if (!map || !occurrenceLayerRef.current || !heatLayerRef.current) return
+    if (!map || !occurrenceLayerRef.current || !heatLayerRef.current || !victimLayerRef.current) return
 
     occurrenceLayerRef.current.clearLayers()
     heatLayerRef.current.clearLayers()
+    victimLayerRef.current.clearLayers()
 
-    const valid = ocorrencias.filter((item) => isValidCoord(item.lat) && isValidCoord(item.lng))
+    const validOccurrences = ocorrencias.filter((item) => isValidCoord(item.lat) && isValidCoord(item.lng))
+    const validVictims = vitimas.filter((item) => isValidCoord(item.lat) && isValidCoord(item.lng))
 
-    valid.forEach((item) => {
-      const style = getSeverityStyle(item.severidade)
+    if (showOccurrences) {
+      validOccurrences.forEach((item) => {
+        const style = getSeverityStyle(item.severidade)
+        const popup = `<b>${escapeHtml(item.titulo || 'Ocorrência')}</b><br/>Severidade: ${escapeHtml(item.severidade || 'Moderado')}`
 
-      if (heatmap) {
-        L.circle([item.lat, item.lng], {
-          pane: 'smdnHeatPane',
-          radius: style.radius,
-          stroke: false,
-          fillColor: style.color,
-          fillOpacity: style.opacity,
-          interactive: false,
-          className: 'smdn-heat-circle',
-        })
-          .bindPopup(`<b>${item.titulo || 'Ocorrência'}</b><br/>Severidade: ${item.severidade || 'Moderado'}`)
-          .addTo(heatLayerRef.current)
+        if (showHeat) {
+          L.circle([item.lat, item.lng], {
+            pane: 'smdnHeatPane',
+            radius: style.radius,
+            stroke: false,
+            fillColor: style.color,
+            fillOpacity: style.opacity,
+            interactive: false,
+            className: 'smdn-heat-circle',
+          })
+            .bindPopup(popup)
+            .addTo(heatLayerRef.current)
 
-        L.circleMarker([item.lat, item.lng], {
-          radius: 5,
-          fillColor: style.color,
-          color: '#fff',
-          weight: 1.5,
-          fillOpacity: 0.9,
-        })
-          .bindPopup(`<b>${item.titulo || 'Ocorrência'}</b><br/>Severidade: ${item.severidade || 'Moderado'}`)
-          .addTo(heatLayerRef.current)
-      } else {
-        L.circleMarker([item.lat, item.lng], {
-          radius: 10,
-          fillColor: style.color,
-          color: '#fff',
-          weight: 2,
-          fillOpacity: 0.9,
-        })
-          .bindPopup(`<b>${item.titulo || 'Ocorrência'}</b><br/>Severidade: ${item.severidade || 'Moderado'}`)
-          .addTo(occurrenceLayerRef.current)
-      }
+          L.circleMarker([item.lat, item.lng], {
+            radius: 5,
+            fillColor: style.color,
+            color: '#fff',
+            weight: 1.5,
+            fillOpacity: 0.9,
+          })
+            .bindPopup(popup)
+            .addTo(heatLayerRef.current)
+        } else {
+          L.circleMarker([item.lat, item.lng], {
+            radius: 10,
+            fillColor: style.color,
+            color: '#fff',
+            weight: 2,
+            fillOpacity: 0.9,
+          })
+            .bindPopup(popup)
+            .addTo(occurrenceLayerRef.current)
+        }
+      })
+    }
+
+    validVictims.forEach((item) => {
+      const sourceLabel = item.source === 'localizacao_dispositivo'
+        ? 'Localização do dispositivo'
+        : 'Último relato com localização'
+
+      L.circleMarker([item.lat, item.lng], {
+        radius: 7,
+        fillColor: '#020617',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 0.95,
+        className: 'smdn-victim-marker',
+      })
+        .bindPopup(`<b>${escapeHtml(item.name || 'Vítima localizada')}</b><br/>${escapeHtml(sourceLabel)}`)
+        .addTo(victimLayerRef.current)
     })
 
-    if (valid.length > 0) {
-      const bounds = L.latLngBounds(valid.map((item) => [item.lat, item.lng]))
+    const visiblePoints = effectiveMode === 'victims'
+      ? validVictims
+      : [...validOccurrences, ...validVictims]
+
+    if (visiblePoints.length > 0) {
+      const bounds = L.latLngBounds(visiblePoints.map((item) => [item.lat, item.lng]))
       map.fitBounds(bounds.pad(0.25), { maxZoom: 12, animate: true })
     }
-  }, [ocorrencias, heatmap])
+  }, [ocorrencias, vitimas, effectiveMode, showOccurrences, showHeat])
 
   useEffect(() => {
     if (!targetLocation || !mapInstanceRef.current) return

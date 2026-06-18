@@ -18,6 +18,16 @@ const SEVERITY_CONFIG = {
   regular: { label: 'Moderado', cls: 'badge-regular', dotColor: '#cab900' },
 }
 
+const MAP_MODES = [
+  { id: 'heat', label: 'Mapa de calor', aria: 'Exibir mapa de calor com ocorrências e vítimas' },
+  { id: 'points', label: 'Pontos', aria: 'Exibir pontos de ocorrências e vítimas' },
+  { id: 'victims', label: 'Vítimas', aria: 'Exibir somente pontos de vítimas' },
+]
+
+function normalizeMapMode(value) {
+  return MAP_MODES.some((mode) => mode.id === value) ? value : 'heat'
+}
+
 function toMapOcorrencias(ocorrencias) {
   return ocorrencias
     .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
@@ -26,6 +36,19 @@ function toMapOcorrencias(ocorrencias) {
       lng: item.lng,
       titulo: item.title,
       severidade: SEVERITY_CONFIG[item.severity]?.label || 'Moderado',
+    }))
+}
+
+function toMapVictims(victims) {
+  return (victims || [])
+    .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
+    .map((item) => ({
+      id: item.id,
+      name: item.name || 'Vítima localizada',
+      lat: item.lat,
+      lng: item.lng,
+      source: item.source,
+      updatedAt: item.updatedAt,
     }))
 }
 
@@ -52,19 +75,32 @@ export default function Dashboard() {
       activeAlerts: 0,
       criticalSeverity: 0,
       resolvedToday: 0,
+      locatedVictims: 0,
     },
     recentOccurrences: [],
+    victims: [],
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { settings } = useSmdnSettings()
-  const [mapMode, setMapMode] = useState(settings.defaultMapMode || 'heat')
+  const [mapMode, setMapMode] = useState(normalizeMapMode(settings.defaultMapMode))
   const mapRef = useRef(null)
 
   const mapOccurrences = useMemo(
     () => toMapOcorrencias(dashboard.recentOccurrences),
     [dashboard.recentOccurrences]
   )
+
+  const mapVictims = useMemo(
+    () => toMapVictims(dashboard.victims),
+    [dashboard.victims]
+  )
+
+  const dashboardSummary = [
+    { label: 'No mapa', value: mapOccurrences.length },
+    { label: 'Vítimas', value: mapVictims.length },
+    { label: 'Críticos', value: dashboard.stats.criticalSeverity },
+  ]
 
   async function loadDashboard() {
     try {
@@ -83,7 +119,7 @@ export default function Dashboard() {
     return subscribeDashboardChanges(loadDashboard)
   }, [])
   useEffect(() => {
-    setMapMode(settings.defaultMapMode || 'heat')
+    setMapMode(normalizeMapMode(settings.defaultMapMode))
   }, [settings.defaultMapMode])
 
 
@@ -123,31 +159,67 @@ export default function Dashboard() {
   ]
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-slate-100 p-4 animate-fade-in">
-      <Card className="absolute inset-4 !p-0 overflow-hidden !border-0 !shadow-none !rounded-[22px] z-0 bg-transparent">
-        <MapView ref={mapRef} ocorrencias={mapOccurrences} heatmap={mapMode === 'heat'} />
+    <div className="relative w-full h-full overflow-hidden bg-bg-main p-4 animate-fade-in">
+      <Card
+        className="absolute inset-4 !p-0 overflow-hidden !border-0 !shadow-none !rounded-[22px] z-0 bg-transparent"
+        role="region"
+        aria-label="Mapa de monitoramento com ocorrências e vítimas localizadas"
+      >
+        <p className="sr-only" aria-live="polite">
+          Dashboard com {mapOccurrences.length} ocorrência(s) com localização e {mapVictims.length} vítima(s) localizada(s).
+          Filtro atual do mapa: {MAP_MODES.find((mode) => mode.id === mapMode)?.label}.
+        </p>
 
-        <div className="absolute top-4 left-16 z-[500] flex rounded-xl bg-white/90 backdrop-blur-sm border border-border-soft shadow-sm overflow-hidden">
-          <button
-            className={`px-3 py-2 text-xs font-bold transition-colors ${mapMode === 'heat' ? 'bg-text-main text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-            onClick={() => setMapMode('heat')}
-          >
-            Mapa de calor
-          </button>
-          <button
-            className={`px-3 py-2 text-xs font-bold transition-colors ${mapMode === 'points' ? 'bg-text-main text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-            onClick={() => setMapMode('points')}
-          >
-            Pontos
-          </button>
+        <MapView
+          ref={mapRef}
+          ocorrencias={mapOccurrences}
+          vitimas={mapVictims}
+          mapMode={mapMode}
+          heatmap={mapMode === 'heat'}
+        />
+
+        <div
+          className="absolute top-4 left-16 z-[500] flex rounded-xl bg-bg-surface/95 backdrop-blur-sm border border-border-soft shadow-sm overflow-hidden"
+          role="group"
+          aria-label="Filtro de visualização do mapa"
+        >
+          {MAP_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              className={`px-3 py-2 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${mapMode === mode.id ? 'bg-text-main text-white' : 'text-slate-600 hover:bg-action-hover/20'}`}
+              onClick={() => setMapMode(mode.id)}
+              aria-pressed={mapMode === mode.id}
+              aria-label={mode.aria}
+            >
+              {mode.label}
+            </button>
+          ))}
         </div>
+
+        {mapVictims.length > 0 && (
+          <div className="absolute top-16 left-16 z-[500] rounded-xl border border-border-soft bg-bg-surface/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-sm">
+            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-black align-middle ring-2 ring-white" />
+            {mapMode === 'victims' ? 'Exibindo somente vítimas' : `${mapVictims.length} vítima(s) no mapa`}
+          </div>
+        )}
       </Card>
 
-      <Card className="absolute top-8 right-8 w-80 max-h-[430px] shadow-xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-0 overflow-hidden flex flex-col z-10">
+      <Card className="absolute top-8 right-8 w-80 max-h-[430px] shadow-xl border border-border-soft bg-bg-surface/95 backdrop-blur-sm p-0 overflow-hidden flex flex-col z-10">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-800">Ocorrências Recentes</h3>
             <p className="text-[11px] text-slate-400">Relatos enviados pelo mobile</p>
+            <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Resumo rápido do dashboard">
+              {dashboardSummary.map((item) => (
+                <span
+                  key={item.label}
+                  className="rounded-full border border-border-soft bg-action-hover/10 px-2 py-0.5 text-[10px] font-bold text-slate-600"
+                >
+                  {item.label}: {item.value}
+                </span>
+              ))}
+            </div>
           </div>
           {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
         </div>
@@ -169,8 +241,10 @@ export default function Dashboard() {
               return (
                 <button
                   key={occ.id}
+                  type="button"
                   onClick={() => handleOccClick(occ)}
-                  className="w-full flex items-start gap-2.5 px-4 py-3 hover:bg-slate-50/80 transition-colors text-left"
+                  aria-label={`Abrir detalhes de ${occ.title}, severidade ${cfg.label}, ${occ.city}`}
+                  className="w-full flex items-start gap-2.5 px-4 py-3 hover:bg-slate-50/80 transition-colors text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-500"
                 >
                   <span
                     className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1"
@@ -195,13 +269,19 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      <div className="absolute w-[80%] h-20 bottom-8 left-1/2 -translate-x-1/2 flex justify-between items-center gap-6 z-10 pointer-events-none">
+      <div
+        className="absolute w-[80%] h-20 bottom-8 left-1/2 -translate-x-1/2 flex justify-between items-center gap-6 z-10 pointer-events-none"
+        role="list"
+        aria-label="Indicadores do dashboard"
+      >
         {statCards.map((card) => (
           <Card
             key={card.label}
-            className="pointer-events-auto flex items-center gap-4 py-3 px-4 bg-[#A6C1D4]/95 backdrop-blur-sm shadow-lg border border-slate-300/50 w-full h-full"
+            role="listitem"
+            aria-label={`${card.label}: ${card.value}`}
+            className="pointer-events-auto flex items-center gap-4 py-3 px-4 bg-bg-surface/95 backdrop-blur-sm shadow-lg border border-border-soft w-full h-full"
           >
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-action-hover/15 flex items-center justify-center flex-shrink-0">
               <img src={card.icon} alt={card.label} className="w-[80%] h-[80%] object-contain" />
             </div>
             <div className="min-w-0">
