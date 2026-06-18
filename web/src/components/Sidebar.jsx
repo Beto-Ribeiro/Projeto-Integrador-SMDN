@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { id: 'ocorrencias', label: 'Ocorrências', icon: <img src={ocorrenciasIcon} width="20" height="20" alt="alert-triangle" />, iconWhite: <img src={ocorrenciasIconWHITE} width="20" height="20" alt="alert-triangle" /> },
   { id: 'relatorios', label: 'Relatórios', icon: <img src={relatoriosIcon} width="20" height="20" alt="pie-chart" />, iconWhite: <img src={relatoriosIconWHITE} width="20" height="20" alt="pie-chart" /> },
   { id: 'auditoria', label: 'Auditoria', icon: <img src={auditoriaIcon} width="20" height="20" alt="lock" />, iconWhite: <img src={auditoriaIconWHITE} width="20" height="20" alt="lock" /> },
+  { id: 'perfil', label: 'Perfil', icon: <img src={perfilIcon} width="20" height="20" alt="user" />, iconWhite: <img src={perfilIconWHITE} width="20" height="20" alt="user" /> },
 ]
 
 const ADMIN_ITEMS = [

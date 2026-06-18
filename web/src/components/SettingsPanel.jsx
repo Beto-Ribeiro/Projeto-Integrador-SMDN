@@ -79,9 +79,12 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
   }, [open])
 
   const isIcon = variant === 'icon'
+  const isAction = variant === 'action'
   const buttonClassName = isIcon
     ? `inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-slate-500 hover:bg-slate-50 hover:text-text-main transition-all ${className}`
-    : `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${className}`
+    : isAction
+      ? `w-full flex items-center justify-center gap-2 rounded-xl border border-border-soft bg-bg-surface px-3 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-text-main transition-all ${className}`
+      : `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${className}`
 
   return (
     <div className="relative">
@@ -95,7 +98,7 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
         title="Configurações"
       >
         <GearIcon />
-        {!isIcon && <span>Configurações</span>}
+        {!isIcon && <span>{isAction ? 'Config.' : 'Configurações'}</span>}
       </button>
 
       {open && (
