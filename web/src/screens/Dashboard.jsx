@@ -8,19 +8,36 @@ import Flag from '../assets/menu/inativo/flag.svg'
 import FlagLight from '../assets/menu/light/flag.svg'
 import Map_pin from '../assets/menu/inativo/map-pin.svg'
 import Map_pinLight from '../assets/menu/light/map-pin.svg'
-import Heart from '../assets/menu/inativo/heart.svg'
-import HeartLight from '../assets/menu/light/heart.svg'
+import CheckCircle from '../assets/dashboard/check-circle.svg'
+import CheckCircleLight from '../assets/dashboard/check-circle-light.svg'
 import {
   getDashboardData,
   subscribeDashboardChanges,
+  updateVictimAssistance,
 } from '../backend/dashboard/dashboardService.js'
 import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
+import {
+  formatOccurrenceDate,
+  updateOcorrenciaStatus,
+} from '../backend/ocorrencias/ocorrenciasService.js'
 
 const SEVERITY_CONFIG = {
   critical: { label: 'Crítico', cls: 'badge-critical', dotColor: '#c60202' },
   severe: { label: 'Grave', cls: 'badge-severe', dotColor: '#ff6a00' },
   regular: { label: 'Moderado', cls: 'badge-regular', dotColor: '#cab900' },
 }
+
+const STATUS_MAP = {
+  active: { label: 'Ativa', dot: 'bg-status-critical', cls: 'text-status-critical bg-status-critical-bg border-status-critical/20' },
+  monitoring: { label: 'Monitorando', dot: 'bg-status-regular', cls: 'text-status-regular bg-status-regular-bg border-status-regular/20' },
+  resolved: { label: 'Resolvida', dot: 'bg-status-success', cls: 'text-status-success bg-status-success-bg border-status-success/20' },
+}
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Ativa' },
+  { value: 'monitoring', label: 'Monitorando' },
+  { value: 'resolved', label: 'Resolvida' },
+]
 
 const MAP_MODES = [
   { id: 'heat', label: 'Mapa de calor', aria: 'Exibir mapa de calor com ocorrências e vítimas' },
@@ -38,8 +55,10 @@ function toMapOcorrencias(ocorrencias) {
     .map((item) => ({
       lat: item.lat,
       lng: item.lng,
+      id: item.relatoId || item.id,
       titulo: item.title,
       severidade: SEVERITY_CONFIG[item.severity]?.label || 'Moderado',
+      original: item,
     }))
 }
 
@@ -53,26 +72,17 @@ function toMapVictims(victims) {
       lng: item.lng,
       source: item.source,
       updatedAt: item.updatedAt,
+      assistanceStatus: item.assistanceStatus || 'pendente',
+      assistedAt: item.assistedAt,
+      assistedBy: item.assistedBy,
     }))
-}
-
-function formatFullDate(value) {
-  if (!value) return 'Data não informada'
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Data não informada'
-
-  return date.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 export default function Dashboard() {
   const [selectedOcc, setSelectedOcc] = useState(null)
+  const [statusDraft, setStatusDraft] = useState('active')
+  const [savingStatus, setSavingStatus] = useState(false)
+  const [savingVictimId, setSavingVictimId] = useState('')
   const [recentMinimized, setRecentMinimized] = useState(false)
   const [statsMinimized, setStatsMinimized] = useState(false)
   const [dashboard, setDashboard] = useState({
@@ -82,6 +92,7 @@ export default function Dashboard() {
       criticalSeverity: 0,
       resolvedToday: 0,
       locatedVictims: 0,
+      assistedVictims: 0,
     },
     recentOccurrences: [],
     victims: [],
@@ -127,6 +138,11 @@ export default function Dashboard() {
     setMapMode(normalizeMapMode(settings.defaultMapMode))
   }, [settings.defaultMapMode])
 
+  useEffect(() => {
+    if (selectedOcc) {
+      setStatusDraft(selectedOcc.status || 'active')
+    }
+  }, [selectedOcc])
 
   function handleOccClick(occ) {
     if (Number.isFinite(occ.lat) && Number.isFinite(occ.lng)) {
@@ -134,6 +150,50 @@ export default function Dashboard() {
     }
 
     setSelectedOcc(occ)
+  }
+
+  function handleMapOccurrenceDetails(mapItem) {
+    const occurrence = mapItem?.original || dashboard.recentOccurrences.find((item) => {
+      return item.relatoId === mapItem?.id || item.id === mapItem?.id
+    })
+
+    if (occurrence) {
+      handleOccClick(occurrence)
+    }
+  }
+
+  async function handleStatusUpdate() {
+    if (!selectedOcc) return
+
+    setSavingStatus(true)
+    setError('')
+
+    try {
+      await updateOcorrenciaStatus({ relatoId: selectedOcc.relatoId, status: statusDraft })
+      await loadDashboard()
+      setSelectedOcc((current) => current ? { ...current, status: statusDraft } : current)
+    } catch (err) {
+      setError(err.message || 'Não foi possível atualizar o status.')
+    } finally {
+      setSavingStatus(false)
+    }
+  }
+
+
+  async function handleVictimAssistance(victim) {
+    if (!victim?.id || victim.assistanceStatus === 'atendida') return
+
+    setSavingVictimId(victim.id)
+    setError('')
+
+    try {
+      await updateVictimAssistance({ victim, status: 'atendida' })
+      await loadDashboard()
+    } catch (err) {
+      setError(err.message || 'Não foi possível marcar a vítima como atendida.')
+    } finally {
+      setSavingVictimId('')
+    }
   }
 
   const useLightIcons = effectiveTheme === 'dark'
@@ -161,7 +221,7 @@ export default function Dashboard() {
       label: 'RESOLVIDAS HOJE',
       value: dashboard.stats.resolvedToday,
       color: 'text-status-success',
-      icon: useLightIcons ? HeartLight : Heart,
+      icon: useLightIcons ? CheckCircleLight : CheckCircle,
     },
   ]
 
@@ -183,6 +243,9 @@ export default function Dashboard() {
           vitimas={mapVictims}
           mapMode={mapMode}
           heatmap={mapMode === 'heat'}
+          onOccurrenceDetails={handleMapOccurrenceDetails}
+          onVictimAssistance={handleVictimAssistance}
+          savingVictimId={savingVictimId}
         />
 
         <div
@@ -205,14 +268,17 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      <div className="absolute top-8 right-8 z-10 flex w-80 flex-col items-end gap-3">
+      <div
+        className="absolute top-8 right-8 z-10 flex flex-col items-end gap-3"
+        style={{ width: 'clamp(20rem, 28vw, 28rem)' }}
+      >
         {recentMinimized ? (
           <div className="flex items-center gap-2 self-end">
             {mapVictims.length > 0 && (
               <Card className="!rounded-xl border border-border-soft bg-bg-surface/95 px-3 py-2 shadow-lg backdrop-blur-sm">
                 <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-black align-middle ring-2 ring-white" />
                 <span className="text-[11px] font-bold text-slate-700">
-                  {mapMode === 'victims' ? 'Somente vítimas' : `${mapVictims.length} vítima(s)`}
+                  {mapMode === 'victims' ? `${mapVictims.length} vítima(s)` : `${mapVictims.length} vítima(s) · ${dashboard.stats.assistedVictims || 0} atendida(s)`}
                 </span>
               </Card>
             )}
@@ -235,7 +301,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <Card
-            className="w-full max-h-[430px] shadow-xl border border-border-soft bg-bg-surface/95 backdrop-blur-sm p-0 overflow-hidden flex flex-col transition-all duration-200"
+            className="w-full max-h-[360px] shadow-xl border border-border-soft bg-bg-surface/95 backdrop-blur-sm p-0 overflow-hidden flex flex-col transition-all duration-200"
             role="region"
             aria-label="Ocorrências recentes"
           >
@@ -320,7 +386,7 @@ export default function Dashboard() {
           <Card className="self-start !rounded-xl border border-border-soft bg-bg-surface/95 px-3 py-2 shadow-lg backdrop-blur-sm">
             <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-black align-middle ring-2 ring-white" />
             <span className="text-[11px] font-bold text-slate-700">
-              {mapMode === 'victims' ? 'Somente vítimas no mapa' : `${mapVictims.length} vítima(s) no mapa`}
+              {mapMode === 'victims' ? `${mapVictims.length} vítima(s) no mapa` : `${mapVictims.length} vítima(s) · ${dashboard.stats.assistedVictims || 0} atendida(s)`}
             </span>
           </Card>
         )}
@@ -330,14 +396,18 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => setStatsMinimized(false)}
-          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-border-soft bg-bg-surface/95 px-4 py-3 text-xs font-bold text-slate-700 shadow-lg backdrop-blur-sm hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+          className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-border-soft bg-bg-surface/95 px-4 py-3 text-xs font-bold text-slate-700 shadow-lg backdrop-blur-sm hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
           aria-label="Expandir indicadores do dashboard"
         >
           Mostrar indicadores · {dashboard.stats.activeOccurrences} ativas · {dashboard.stats.activeAlerts} alertas · {dashboard.stats.criticalSeverity} críticas
         </button>
       ) : (
         <div
-          className="absolute w-[80%] h-20 bottom-8 left-1/2 -translate-x-1/2 flex justify-between items-center gap-6 z-10 pointer-events-none"
+          className="absolute bottom-6 left-16 right-16 z-10 grid pointer-events-none"
+          style={{
+            gridTemplateColumns: 'repeat(auto-fit, minmax(clamp(11rem, 18vw, 15rem), 1fr))',
+            gap: 'clamp(0.9rem, 1.6vw, 1.75rem)',
+          }}
           role="list"
           aria-label="Indicadores do dashboard"
         >
@@ -355,64 +425,77 @@ export default function Dashboard() {
               key={card.label}
               role="listitem"
               aria-label={`${card.label}: ${card.value}`}
-              className="pointer-events-auto flex items-center gap-4 py-3 px-4 bg-bg-surface/95 backdrop-blur-sm shadow-lg border border-border-soft w-full h-full"
+              className="pointer-events-auto flex min-h-[70px] items-center gap-3 px-4 py-3 bg-bg-surface/95 backdrop-blur-sm shadow-lg border border-border-soft w-full max-w-full"
             >
-              <div className="w-10 h-10 rounded-xl bg-action-hover/15 flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-action-hover/15 flex items-center justify-center flex-shrink-0">
                 <img src={card.icon} alt={card.label} className="w-[80%] h-[80%] object-contain" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold text-slate-700 tracking-wider truncate">{card.label}</p>
-                <p className={`text-2xl font-black mt-0.5 ${card.color}`}>{card.value}</p>
+                <p className="text-[clamp(8px,0.72vw,10px)] font-bold text-slate-700 tracking-wider truncate">{card.label}</p>
+                <p className={`text-[clamp(18px,1.9vw,24px)] font-black mt-0.5 leading-none ${card.color}`}>{card.value}</p>
               </div>
             </Card>
           ))}
         </div>
       )}
 
-      <Modal isOpen={!!selectedOcc} onClose={() => setSelectedOcc(null)} title="Detalhes da Ocorrência" size="md">
+      <Modal isOpen={!!selectedOcc} onClose={() => setSelectedOcc(null)} title={`Ocorrência ${selectedOcc?.id || ''}`} size="md">
         {selectedOcc && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-slate-800">{selectedOcc.title}</span>
+              <span className="font-bold text-lg text-slate-800">{selectedOcc.type}</span>
               <span className={SEVERITY_CONFIG[selectedOcc.severity]?.cls || SEVERITY_CONFIG.regular.cls}>
                 {SEVERITY_CONFIG[selectedOcc.severity]?.label || 'Moderado'}
+              </span>
+              <span className={`inline-flex items-center gap-1.5 border text-xs font-bold px-2.5 py-0.5 rounded-badge ${(STATUS_MAP[selectedOcc.status] || STATUS_MAP.active).cls}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${(STATUS_MAP[selectedOcc.status] || STATUS_MAP.active).dot}`} />
+                {(STATUS_MAP[selectedOcc.status] || STATUS_MAP.active).label}
               </span>
             </div>
 
             {selectedOcc.photoUrl && (
               <img
                 src={selectedOcc.photoUrl}
-                alt="Foto do relato"
+                alt="Foto da ocorrência"
                 className="w-full max-h-64 object-cover rounded-xl border border-border-soft"
               />
             )}
 
-            <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-label text-slate-400">TIPO DE DESASTRE</dt>
-                <dd className="text-slate-700 font-medium mt-0.5">{selectedOcc.type}</dd>
-              </div>
-              <div>
-                <dt className="text-label text-slate-400">NÍVEL INFORMADO</dt>
-                <dd className="text-slate-700 font-medium mt-0.5">{selectedOcc.riskLabel}</dd>
-              </div>
-              <div>
-                <dt className="text-label text-slate-400">CIDADÃO</dt>
-                <dd className="text-slate-700 font-medium mt-0.5">{selectedOcc.citizenName}</dd>
-              </div>
-              <div>
-                <dt className="text-label text-slate-400">REPORTADO EM</dt>
-                <dd className="text-slate-700 font-medium mt-0.5">{formatFullDate(selectedOcc.reportedAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-label text-slate-400">LOCALIZAÇÃO</dt>
-                <dd className="text-slate-700 font-medium mt-0.5">
-                  {Number.isFinite(selectedOcc.lat) && Number.isFinite(selectedOcc.lng)
-                    ? `${selectedOcc.lat.toFixed(5)}, ${selectedOcc.lng.toFixed(5)}`
-                    : 'Localização não informada'}
-                </dd>
-              </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div><dt className="text-label text-slate-400">MUNICÍPIO</dt><dd className="text-slate-700 font-medium mt-0.5">{selectedOcc.city}</dd></div>
+              <div><dt className="text-label text-slate-400">BAIRRO</dt><dd className="text-slate-700 font-medium mt-0.5">{selectedOcc.neighborhood}</dd></div>
+              <div><dt className="text-label text-slate-400">DATA DE REGISTRO</dt><dd className="text-slate-700 font-medium mt-0.5">{formatOccurrenceDate(selectedOcc.reportedAt)}</dd></div>
+              <div><dt className="text-label text-slate-400">CIDADÃO</dt><dd className="text-slate-700 font-medium mt-0.5">{selectedOcc.citizenName}</dd></div>
+              <div><dt className="text-label text-slate-400">NÍVEL INFORMADO</dt><dd className="text-slate-700 font-medium mt-0.5">{selectedOcc.riskLabel}</dd></div>
+              <div><dt className="text-label text-slate-400">LOCALIZAÇÃO</dt><dd className="text-slate-700 font-medium mt-0.5">{Number.isFinite(selectedOcc.lat) && Number.isFinite(selectedOcc.lng) ? `${selectedOcc.lat.toFixed(5)}, ${selectedOcc.lng.toFixed(5)}` : 'Não informada'}</dd></div>
             </dl>
+
+            <div>
+              <p className="text-label text-slate-400 mb-1">DESCRIÇÃO</p>
+              <p className="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 border border-border-soft">{selectedOcc.description}</p>
+            </div>
+
+            <div className="rounded-xl border border-border-soft bg-slate-50 p-3">
+              <label className="block text-label text-slate-500 mb-1.5">ATUALIZAR STATUS</label>
+              <div className="flex gap-3">
+                <select
+                  className="select-field flex-1"
+                  value={statusDraft}
+                  onChange={(event) => setStatusDraft(event.target.value)}
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <button
+                  className="btn-primary"
+                  disabled={savingStatus}
+                  onClick={handleStatusUpdate}
+                >
+                  {savingStatus ? 'Salvando...' : 'Salvar Status'}
+                </button>
+              </div>
+            </div>
 
             <div className="flex justify-end gap-3 pt-2 border-t border-border-soft">
               <button className="btn-ghost" onClick={() => setSelectedOcc(null)}>Fechar</button>

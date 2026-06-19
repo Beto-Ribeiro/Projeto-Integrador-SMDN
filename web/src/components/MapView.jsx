@@ -32,8 +32,77 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;')
 }
 
+
+function createOccurrencePopupNode(item, onOccurrenceDetails) {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'smdn-map-popup'
+
+  const title = document.createElement('strong')
+  title.textContent = item.titulo || 'Ocorrência'
+  wrapper.appendChild(title)
+
+  const severity = document.createElement('div')
+  severity.textContent = `Severidade: ${item.severidade || 'Moderado'}`
+  wrapper.appendChild(severity)
+
+  if (onOccurrenceDetails) {
+    const details = document.createElement('button')
+    details.type = 'button'
+    details.textContent = 'Ver detalhes'
+    details.className = 'smdn-map-details-link'
+    details.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onOccurrenceDetails(item)
+    })
+    wrapper.appendChild(details)
+  }
+
+  return wrapper
+}
+
+
+function createVictimPopupNode(item, onVictimAssistance, savingVictimId) {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'smdn-map-popup smdn-victim-popup'
+
+  const title = document.createElement('strong')
+  title.textContent = item.name || 'Vítima localizada'
+  wrapper.appendChild(title)
+
+  const source = item.source === 'localizacao_dispositivo'
+    ? 'Localização do dispositivo'
+    : 'Último relato com localização'
+
+  const sourceLine = document.createElement('div')
+  sourceLine.textContent = source
+  wrapper.appendChild(sourceLine)
+
+  const status = document.createElement('div')
+  const attended = item.assistanceStatus === 'atendida'
+  status.innerHTML = `<b>Status:</b> ${attended ? 'Atendida / socorrida' : 'Pendente de atendimento'}`
+  status.className = attended ? 'smdn-victim-status smdn-victim-status-ok' : 'smdn-victim-status smdn-victim-status-pending'
+  wrapper.appendChild(status)
+
+  if (!attended && onVictimAssistance) {
+    const action = document.createElement('button')
+    action.type = 'button'
+    action.textContent = savingVictimId === item.id ? 'Salvando...' : 'Marcar como atendida'
+    action.disabled = savingVictimId === item.id
+    action.className = 'smdn-map-details-link smdn-victim-action'
+    action.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onVictimAssistance(item)
+    })
+    wrapper.appendChild(action)
+  }
+
+  return wrapper
+}
+
 const MapView = forwardRef(function MapView(
-  { ocorrencias = [], vitimas = [], onMapClick, targetLocation, heatmap = false, mapMode },
+  { ocorrencias = [], vitimas = [], onMapClick, onOccurrenceDetails, onVictimAssistance, savingVictimId, targetLocation, heatmap = false, mapMode },
   ref
 ) {
   const mapRef = useRef(null)
@@ -150,6 +219,43 @@ const MapView = forwardRef(function MapView(
         .smdn-victim-marker {
           filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.35));
         }
+
+        .smdn-victim-status {
+          margin-top: 5px;
+          font-size: 12px;
+        }
+
+        .smdn-victim-status-ok {
+          color: #16a34a;
+        }
+
+        .smdn-victim-status-pending {
+          color: #b45309;
+        }
+
+        .smdn-victim-action:disabled {
+          opacity: 0.6;
+          cursor: wait;
+        }
+
+        .smdn-map-details-link {
+          display: inline-block;
+          margin-top: 6px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: #0b63a6;
+          font: inherit;
+          font-weight: 700;
+          text-decoration: underline;
+          cursor: pointer;
+        }
+
+        .smdn-map-details-link:focus-visible {
+          outline: 2px solid #0ea5e9;
+          outline-offset: 2px;
+          border-radius: 4px;
+        }
       `
       document.head.appendChild(style)
     }
@@ -176,7 +282,7 @@ const MapView = forwardRef(function MapView(
     if (showOccurrences) {
       validOccurrences.forEach((item) => {
         const style = getSeverityStyle(item.severidade)
-        const popup = `<b>${escapeHtml(item.titulo || 'Ocorrência')}</b><br/>Severidade: ${escapeHtml(item.severidade || 'Moderado')}`
+        const popup = createOccurrencePopupNode(item, onOccurrenceDetails)
 
         if (showHeat) {
           L.circle([item.lat, item.lng], {
@@ -215,19 +321,18 @@ const MapView = forwardRef(function MapView(
     }
 
     validVictims.forEach((item) => {
-      const sourceLabel = item.source === 'localizacao_dispositivo'
-        ? 'Localização do dispositivo'
-        : 'Último relato com localização'
+      const attended = item.assistanceStatus === 'atendida'
+      const popup = createVictimPopupNode(item, onVictimAssistance, savingVictimId)
 
       L.circleMarker([item.lat, item.lng], {
-        radius: 7,
-        fillColor: '#020617',
+        radius: attended ? 8 : 7,
+        fillColor: attended ? '#16a34a' : '#020617',
         color: '#ffffff',
         weight: 2,
         fillOpacity: 0.95,
         className: 'smdn-victim-marker',
       })
-        .bindPopup(`<b>${escapeHtml(item.name || 'Vítima localizada')}</b><br/>${escapeHtml(sourceLabel)}`)
+        .bindPopup(popup)
         .addTo(victimLayerRef.current)
     })
 
@@ -239,7 +344,7 @@ const MapView = forwardRef(function MapView(
       const bounds = L.latLngBounds(visiblePoints.map((item) => [item.lat, item.lng]))
       map.fitBounds(bounds.pad(0.25), { maxZoom: 12, animate: true })
     }
-  }, [ocorrencias, vitimas, effectiveMode, showOccurrences, showHeat])
+  }, [ocorrencias, vitimas, effectiveMode, showOccurrences, showHeat, onOccurrenceDetails, onVictimAssistance, savingVictimId])
 
   useEffect(() => {
     if (!targetLocation || !mapInstanceRef.current) return
@@ -282,7 +387,6 @@ const MapView = forwardRef(function MapView(
       color: '#44769b',
       weight: 2,
       fillOpacity: 0.15,
-      className: 'selection-ring'
     }).addTo(map)
 
     selectionMarkerRef.current = L.circleMarker([lat, lng], {
@@ -296,21 +400,6 @@ const MapView = forwardRef(function MapView(
 
     selectionMarkerRef.current.bindPopup('<b>Área selecionada</b>').openPopup()
 
-    if (!document.getElementById('selection-marker-style')) {
-      const style = document.createElement('style')
-      style.id = 'selection-marker-style'
-      style.textContent = `
-        .selection-ring {
-          animation: ring-pulse 1.6s ease-out infinite;
-        }
-        @keyframes ring-pulse {
-          0%   { opacity: 0.6; transform: scale(1); }
-          70%  { opacity: 0;   transform: scale(1.8); }
-          100% { opacity: 0;   transform: scale(1.8); }
-        }
-      `
-      document.head.appendChild(style)
-    }
   }
 
   return <div ref={mapRef} className="smdn-map-root" />

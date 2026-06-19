@@ -2,6 +2,99 @@ import { supabase } from '../supabase/client.js'
 
 const PHOTO_BUCKET = 'Fotos_Storage'
 
+const geocodeCache = new Map()
+
+const KNOWN_CITIES = [
+  { name: 'Pindamonhangaba', lat: -22.9239, lng: -45.4617 },
+  { name: 'Roseira', lat: -22.8988, lng: -45.3070 },
+  { name: 'Taubaté', lat: -23.0264, lng: -45.5553 },
+  { name: 'São José dos Campos', lat: -23.2237, lng: -45.9009 },
+  { name: 'Jacareí', lat: -23.3053, lng: -45.9658 },
+  { name: 'Guaratinguetá', lat: -22.8164, lng: -45.1927 },
+  { name: 'Caraguatatuba', lat: -23.6203, lng: -45.4131 },
+]
+
+function nearestKnownCity(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ''
+
+  return KNOWN_CITIES
+    .map((city) => ({
+      ...city,
+      distance: ((city.lat - lat) * (city.lat - lat)) + ((city.lng - lng) * (city.lng - lng)),
+    }))
+    .sort((a, b) => a.distance - b.distance)[0]?.name || ''
+}
+
+function isGenericLocation(value) {
+  return !value || ['local informado', 'coordenadas disponíveis', 'local não informado'].includes(String(value).toLowerCase())
+}
+
+async function reverseGeocode(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+
+  const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`
+  if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey)
+
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse')
+    url.searchParams.set('format', 'jsonv2')
+    url.searchParams.set('lat', String(lat))
+    url.searchParams.set('lon', String(lng))
+    url.searchParams.set('zoom', '18')
+    url.searchParams.set('addressdetails', '1')
+    url.searchParams.set('accept-language', 'pt-BR')
+
+    const response = await fetch(url.toString())
+    if (!response.ok) throw new Error('Reverse geocode indisponível')
+
+    const data = await response.json()
+    const address = data?.address || {}
+    const city =
+      address.city ||
+      address.town ||
+      address.village ||
+      address.municipality ||
+      address.county ||
+      address.state_district ||
+      ''
+
+    const neighborhood =
+      address.neighbourhood ||
+      address.suburb ||
+      address.quarter ||
+      address.city_district ||
+      address.district ||
+      address.hamlet ||
+      address.road ||
+      ''
+
+    const result = { city, neighborhood }
+    geocodeCache.set(cacheKey, result)
+    return result
+  } catch (error) {
+    console.warn('[SMDN Ocorrências] Geocodificação reversa indisponível:', error.message)
+    geocodeCache.set(cacheKey, null)
+    return null
+  }
+}
+
+async function enrichOccurrenceAddress(item) {
+  const hasCoords = Number.isFinite(item.lat) && Number.isFinite(item.lng)
+  if (!hasCoords) return item
+
+  const shouldLookupCity = isGenericLocation(item.city)
+  const shouldLookupNeighborhood = isGenericLocation(item.neighborhood)
+  if (!shouldLookupCity && !shouldLookupNeighborhood) return item
+
+  const geocode = await reverseGeocode(item.lat, item.lng)
+
+  return {
+    ...item,
+    city: geocode?.city || nearestKnownCity(item.lat, item.lng) || item.city || 'Município não identificado',
+    neighborhood: geocode?.neighborhood || (shouldLookupNeighborhood ? 'Bairro não identificado' : item.neighborhood),
+  }
+}
+
 export function formatOccurrenceDate(value) {
   if (!value) return 'Data não informada'
 
@@ -35,12 +128,16 @@ async function getPhotoUrl(photoPath) {
 
 async function attachPhotos(items) {
   return Promise.all(
-    (items || []).map(async (item) => ({
-      ...item,
-      lat: typeof item.lat === 'number' ? item.lat : item.lat ? Number(item.lat) : null,
-      lng: typeof item.lng === 'number' ? item.lng : item.lng ? Number(item.lng) : null,
-      photoUrl: await getPhotoUrl(item.photoPath),
-    }))
+    (items || []).map(async (item) => {
+      const normalized = {
+        ...item,
+        lat: typeof item.lat === 'number' ? item.lat : item.lat ? Number(item.lat) : null,
+        lng: typeof item.lng === 'number' ? item.lng : item.lng ? Number(item.lng) : null,
+        photoUrl: await getPhotoUrl(item.photoPath),
+      }
+
+      return enrichOccurrenceAddress(normalized)
+    })
   )
 }
 

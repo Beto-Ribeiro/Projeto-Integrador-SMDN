@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
+import SettingsPanel from '../components/SettingsPanel'
 import homeIcon from '../assets/perfil/home.svg'
 import mailIcon from '../assets/perfil/mail.svg'
 import phoneIcon from '../assets/perfil/phone.svg'
@@ -112,7 +113,7 @@ function ActivityHoverSummary({ details, position }) {
 
   return (
     <div
-      className="fixed z-[99999] w-[340px] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-2xl pointer-events-none"
+      className="fixed z-[99999] w-[340px] rounded-2xl border border-border-soft bg-bg-surface p-4 text-left shadow-2xl pointer-events-none"
       style={style}
     >
       <div className="flex items-start gap-3">
@@ -152,10 +153,10 @@ function ActivityDetailsDialog({ details, onClose }) {
       <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-[1px]" />
 
       <div
-        className="absolute right-6 top-6 flex max-h-[calc(100vh-3rem)] w-[min(34rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+        className="absolute right-6 top-6 flex max-h-[calc(100vh-3rem)] w-[min(34rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start gap-3 border-b border-slate-100 p-5">
+        <div className="flex items-start gap-3 border-b border-border-soft p-5">
           {details.actor?.avatar ? (
             <img src={details.actor.avatar} alt={details.actor.name || 'Responsável'} className="h-12 w-12 rounded-full object-cover border border-slate-200" />
           ) : (
@@ -182,7 +183,7 @@ function ActivityDetailsDialog({ details, onClose }) {
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {details.sections.map((section) => (
-            <div key={section.title} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <div key={section.title} className="rounded-2xl border border-border-soft bg-slate-50/70 p-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-2">{section.title}</p>
               <div className="space-y-2">
                 {section.rows.map((row) => (
@@ -257,7 +258,7 @@ function ActivityList({ activities, currentUser }) {
 }
 
 export default function Perfil() {
-  const { user, setUser, isAdmin } = useAuth()
+  const { user, setUser, isAdmin, signOut } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState(makeInitialForm(user))
   const [activities, setActivities] = useState([])
@@ -424,6 +425,22 @@ export default function Perfil() {
           <button className="btn-primary w-full mt-2" onClick={() => setIsEditing(true)}>
             Editar Perfil
           </button>
+
+          <div className="grid w-full grid-cols-2 gap-3">
+            <SettingsPanel
+              variant="action"
+              label="Acessibilidade"
+              className="!py-2.5"
+              panelClassName="!left-6 !bottom-6"
+            />
+            <button
+              type="button"
+              className="w-full rounded-xl border border-border-soft bg-bg-surface px-3 py-2.5 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 hover:text-status-critical focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
+              onClick={signOut}
+            >
+              Sair
+            </button>
+          </div>
         </Card>
 
         <div className="lg:col-span-2 flex flex-col gap-5 h-full min-h-0 overflow-hidden">

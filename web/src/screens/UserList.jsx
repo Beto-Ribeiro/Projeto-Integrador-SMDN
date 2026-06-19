@@ -314,7 +314,7 @@ export default function UserList() {
                   <p className="text-xs text-slate-400">{user.prf_telefone || 'Sem telefone'}</p>
                 </div>
                 <div className="hidden lg:block min-w-[160px] text-xs text-slate-400">Criado em {formatDate(user.prf_created_at)}</div>
-                <span className="text-xs font-semibold text-bg-sidebar">Editar</span>
+                <span className="text-xs font-semibold text-text-main hover:text-action-hover">Editar</span>
               </button>
             ))}
           </div>

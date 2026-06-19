@@ -9,7 +9,25 @@ export const DEFAULT_SETTINGS = {
   reducedMotion: false,
   colorBlind: false,
   density: 'comfortable',
-  defaultMapMode: 'heat',
+  defaultMapMode: 'points',
+}
+
+
+function normalizeSettings(settings) {
+  const next = {
+    ...DEFAULT_SETTINGS,
+    ...(settings || {}),
+  }
+
+  if (next.defaultMapMode === 'heat') {
+    next.defaultMapMode = 'points'
+  }
+
+  if (!['points', 'victims'].includes(next.defaultMapMode)) {
+    next.defaultMapMode = DEFAULT_SETTINGS.defaultMapMode
+  }
+
+  return next
 }
 
 function safeJsonParse(value) {
@@ -24,10 +42,7 @@ export function readSmdnSettings() {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
 
   const stored = safeJsonParse(window.localStorage.getItem(SETTINGS_STORAGE_KEY))
-  return {
-    ...DEFAULT_SETTINGS,
-    ...(stored || {}),
-  }
+  return normalizeSettings(stored)
 }
 
 export function getEffectiveTheme(theme) {
@@ -42,10 +57,7 @@ export function getEffectiveTheme(theme) {
 export function applySmdnSettings(settings) {
   if (typeof document === 'undefined') return
 
-  const next = {
-    ...DEFAULT_SETTINGS,
-    ...(settings || {}),
-  }
+  const next = normalizeSettings(settings)
 
   const root = document.documentElement
   const effectiveTheme = getEffectiveTheme(next.theme)
@@ -60,10 +72,7 @@ export function applySmdnSettings(settings) {
 }
 
 export function saveSmdnSettings(settings) {
-  const next = {
-    ...DEFAULT_SETTINGS,
-    ...(settings || {}),
-  }
+  const next = normalizeSettings(settings)
 
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next))
@@ -83,10 +92,7 @@ export function useSmdnSettings() {
 
   useEffect(() => {
     function handleExternalChange(event) {
-      setSettings({
-        ...DEFAULT_SETTINGS,
-        ...(event.detail || readSmdnSettings()),
-      })
+      setSettings(normalizeSettings(event.detail || readSmdnSettings()))
     }
 
     function handleStorage(event) {

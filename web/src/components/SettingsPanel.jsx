@@ -55,7 +55,7 @@ function OptionGroup({ label, value, options, onChange }) {
   )
 }
 
-export default function SettingsPanel({ variant = 'row', className = '', panelClassName = '' }) {
+export default function SettingsPanel({ variant = 'row', className = '', panelClassName = '', label }) {
   const { settings, effectiveTheme, updateSetting, resetSettings } = useSmdnSettings()
   const [open, setOpen] = useState(false)
   const panelRef = useRef(null)
@@ -80,6 +80,8 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
 
   const isIcon = variant === 'icon'
   const isAction = variant === 'action'
+  const buttonLabel = label || (isAction ? 'Config.' : 'Configurações')
+
   const buttonClassName = isIcon
     ? `inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-slate-500 hover:bg-slate-50 hover:text-text-main transition-all ${className}`
     : isAction
@@ -94,11 +96,11 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
         onClick={() => setOpen((value) => !value)}
         className={buttonClassName}
         aria-expanded={open}
-        aria-label="Abrir configurações de acessibilidade"
+        aria-label={`Abrir ${buttonLabel.toLowerCase()}`}
         title="Configurações"
       >
         <GearIcon />
-        {!isIcon && <span>{isAction ? 'Config.' : 'Configurações'}</span>}
+        {!isIcon && <span>{buttonLabel}</span>}
       </button>
 
       {open && (
@@ -156,16 +158,6 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
               ]}
             />
 
-            <OptionGroup
-              label="Mapa padrão"
-              value={settings.defaultMapMode}
-              onChange={(value) => updateSetting('defaultMapMode', value)}
-              options={[
-                { value: 'heat', label: 'Mapa de calor' },
-                { value: 'points', label: 'Pontos' },
-                { value: 'victims', label: 'Vítimas', description: 'Mostra apenas pontos de vítimas.' },
-              ]}
-            />
 
             <div className="space-y-2">
               <Toggle

@@ -2,10 +2,15 @@ import { useState } from 'react'
 import monitoramentoIcon from '../assets/menu/ativo/map-pin.svg'
 import disparoIcon from '../assets/menu/ativo/flag.svg'
 import relatoriosIcon from '../assets/menu/ativo/pie-chart.svg'
-import logo from '../assets/logo-claro.svg'
+import logoClaro from '../assets/logo-claro.svg'
+import logoEscuro from '../assets/logo.svg'
+import SettingsPanel from '../components/SettingsPanel.jsx'
+import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 
 const Login = ({ view, setView, onLogin, onRegister }) => {
   const isRegister = view === 'cadastro'
+  const { effectiveTheme } = useSmdnSettings()
+  const logo = effectiveTheme === 'light' ? logoEscuro : logoClaro
 
   const [institution, setInstitution] = useState('')
   const [name, setName] = useState('')
@@ -53,6 +58,14 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden">
+      <div className="absolute right-6 top-6 z-30">
+        <SettingsPanel
+          variant="action"
+          label="Acessibilidade"
+          className="rounded-full bg-bg-surface/90 px-4 py-2.5 shadow-lg backdrop-blur-sm"
+          panelClassName="!left-auto !right-6 !top-20 !bottom-auto"
+        />
+      </div>
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/src/assets/map-bg.png')", filter: 'blur(px) brightness(0.7)' }}
@@ -113,7 +126,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
                   value={institution}
                   onChange={(e) => setInstitution(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
+                  className="w-full px-4 py-3 border border-border-soft rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-text-main/40 bg-bg-main/80"
                 >
                   <option value="" disabled>Instituição</option>
                   <option value="Corpo de Bombeiros">Corpo de Bombeiros</option>
@@ -129,7 +142,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
+                  className="w-full px-4 py-3 border border-border-soft rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-text-main/40 bg-bg-main/80"
                 />
               </>
             )}
@@ -140,7 +153,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
+              className="w-full px-4 py-3 border border-border-soft rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-text-main/40 bg-bg-main/80"
             />
 
             {!isRegister && (
@@ -150,7 +163,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
+                className="w-full px-4 py-3 border border-border-soft rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-text-main/40 bg-bg-main/80"
               />
             )}
 
@@ -161,7 +174,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-text-main placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-bg-sidebar bg-gray-50"
+                className="w-full px-4 py-3 border border-border-soft rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-text-main/40 bg-bg-main/80"
               />
             )}
 
@@ -172,7 +185,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
                   id="rememberMe"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-bg-sidebar focus:ring-bg-sidebar border-gray-300 rounded"
+                  className="w-4 h-4 text-text-main focus:ring-text-main border-border-soft rounded"
                 />
                 <label htmlFor="rememberMe" className="text-sm text-gray-500">
                   Mantenha-me logado.
@@ -183,7 +196,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
             <p className="text-sm text-gray-500 text-center">
               <span
                 onClick={() => { setError(''); setView(isRegister ? 'login' : 'cadastro') }}
-                className="text-bg-sidebar font-semibold cursor-pointer hover:underline"
+                className="text-text-main font-bold cursor-pointer hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main rounded"
               >
                 {isRegister ? 'Já tenho acesso SMDN' : 'Solicitar acesso ao SMDN'}
               </span>
@@ -192,7 +205,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
             <button
               onClick={handleSubmit}
               disabled={loading || (isRegister ? !isRegisterValid : !isLoginValid)}
-              className="w-full py-3 bg-bg-sidebar text-text-on-dark rounded-full font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 bg-text-main text-white rounded-full font-semibold text-sm hover:bg-action-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Processando...' : isRegister ? 'Solicitar Acesso' : 'Acessar'}
             </button>
@@ -216,7 +229,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
             </p>
             <button
               onClick={() => { setShowSuccess(false); setView('login') }}
-              className="mt-1 w-full py-2.5 bg-bg-sidebar text-text-on-dark rounded-full font-semibold text-sm hover:opacity-90 transition-all"
+              className="mt-1 w-full py-2.5 bg-text-main text-white rounded-full font-semibold text-sm hover:opacity-90 transition-all"
             >
               Entendido
             </button>
