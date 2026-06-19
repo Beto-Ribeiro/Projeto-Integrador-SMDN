@@ -95,11 +95,15 @@ function NavButton({ item, currentScreen, setCurrentScreen, hoveredItem, setHove
       onMouseLeave={() => setHoveredItem(null)}
       aria-current={active ? 'page' : undefined}
       className={`
-        w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150
-        ${active ? 'bg-text-main text-white shadow-sm' : 'text-text-on-dark hover:bg-white/5 hover:text-white'}
+        group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-200 ease-out
+        focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main
+        ${active
+          ? 'bg-text-main text-white shadow-sm'
+          : 'text-text-on-dark hover:bg-text-main/10 hover:text-text-main hover:translate-x-1 hover:shadow-sm'
+        }
       `}
     >
-      <span>{active || hoveredItem === item.id ? item.iconWhite : item.icon}</span>
+      <span className="transition-transform duration-200 ease-out group-hover:scale-105">{active ? item.iconWhite : item.icon}</span>
       <span className="truncate">{item.label}</span>
     </button>
   )
@@ -252,10 +256,8 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
                       </p>
                     </div>
 
-                    <div className="w-full border-t mt-3 pt-3 text-sm text-slate-600 space-y-2">
+                    <div className="w-full border-t mt-3 pt-3 text-sm text-slate-600 space-y-2 text-center">
                       <p>{displayUser.institution || displayUser.instituicao?.ins_numero || 'SMDN'}</p>
-                      <p className="truncate">{displayUser.email}</p>
-                      <p>{displayUser.phone || displayUser.perfil?.prf_telefone || 'Telefone não informado'}</p>
                     </div>
 
                     <button
@@ -265,7 +267,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
                       }}
                       className="btn-primary w-full mt-4"
                     >
-                      Editar Perfil
+                      Abrir Perfil
                     </button>
                   </div>
                 </div>

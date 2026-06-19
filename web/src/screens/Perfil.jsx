@@ -2,13 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card'
 import Modal from '../components/Modal'
 import SettingsPanel from '../components/SettingsPanel'
-import homeIcon from '../assets/perfil/home.svg'
-import mailIcon from '../assets/perfil/mail.svg'
-import phoneIcon from '../assets/perfil/phone.svg'
 import { useAuth } from '../hooks/useAuth.js'
 import { formatBrazilPhone } from '../utils/phone.js'
 import { formatActivityDate, formatUserActivity, getActivityDetails, listUserActivities } from '../backend/perfil/profileActivityService.js'
 import { uploadAvatarFile } from '../backend/perfil/avatarService.js'
+import { supabase } from '../backend/supabase/client.js'
 import {
   buildProfileChanges,
   hasProfileChanges,
@@ -24,6 +22,22 @@ const PERMISSIONS = [
   { key: 'auditoria', label: 'Auditoria', granted: true },
   { key: 'admin', label: 'Administração de Usuários', granted: true },
 ]
+
+
+function maskEmail(value) {
+  const email = String(value || '').trim()
+  if (!email || !email.includes('@')) return 'e####@mail.com'
+
+  const [name, domain] = email.split('@')
+  const visible = name.slice(0, Math.min(2, Math.max(1, name.length)))
+  return `${visible}####@${domain}`
+}
+
+function maskPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '')
+  if (digits.length < 4) return '12#######10'
+  return `${digits.slice(0, 2)}#######${digits.slice(-2)}`
+}
 
 const FALLBACK_ACTIVITY = [
   { action: 'Login', target: 'Acesso autorizado', at: 'Agora' },
@@ -267,6 +281,7 @@ export default function Perfil() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [showPrivateDetails, setShowPrivateDetails] = useState(false)
 
   useEffect(() => {
     setForm(makeInitialForm(user))
@@ -287,8 +302,31 @@ export default function Perfil() {
 
     loadActivities()
 
+    if (!user?.id) {
+      return () => {
+        mounted = false
+      }
+    }
+
+    const channel = supabase
+      .channel(`perfil-atividades-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'Atividade_Usuario',
+          filter: `atu_user_id=eq.${user.id}`,
+        },
+        () => {
+          loadActivities()
+        },
+      )
+      .subscribe()
+
     return () => {
       mounted = false
+      supabase.removeChannel(channel)
     }
   }, [user?.id, saved])
 
@@ -392,41 +430,39 @@ export default function Perfil() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-        <Card className="lg:col-span-1 flex flex-col items-center text-center py-8 gap-4 h-full min-h-0 overflow-hidden">
+        <Card className="profile-contrast-card lg:col-span-1 flex flex-col items-center text-center py-8 gap-4 h-full min-h-0 overflow-hidden">
           {form.avatarUrl ? (
             <img
               src={form.avatarUrl}
               alt={form.name || 'Foto do perfil'}
-              className="w-20 h-20 rounded-full object-cover border-4 border-text-main/30 bg-slate-100"
+              className="w-28 h-28 rounded-full object-cover border-4 border-text-main/30 bg-slate-100"
             />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-text-main/20 border-4 border-text-main/30 flex items-center justify-center">
+            <div className="w-28 h-28 rounded-full bg-text-main/20 border-4 border-text-main/30 flex items-center justify-center">
               <span className="text-2xl font-bold text-text-main">{initials}</span>
             </div>
           )}
-          <div>
+          <div className="w-full text-center">
             <h2 className="text-card-title font-bold text-slate-800">{form.name}</h2>
             <p className="text-sm text-slate-500 mt-0.5">{form.role}</p>
+            <button
+              type="button"
+              className="mx-auto mt-3 flex max-w-[240px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs font-semibold text-slate-500 transition hover:bg-bg-surface/70 hover:text-text-main focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
+              onClick={() => setShowPrivateDetails((value) => !value)}
+              aria-expanded={showPrivateDetails}
+              title={showPrivateDetails ? 'Ocultar dados de contato' : 'Revelar dados de contato'}
+            >
+              <span className="max-w-full truncate">{showPrivateDetails ? form.email : maskEmail(form.email)}</span>
+              <span>{showPrivateDetails ? (form.phone || 'Telefone não informado') : maskPhone(form.phone)}</span>
+            </button>
           </div>
-          <div className="w-full border-t border-border-soft pt-4 space-y-2 text-sm text-slate-600 text-left">
-            <div className="flex items-center gap-2">
-              <ProfileInfoIcon src={homeIcon} alt="instituição" />
-              <span>{form.institution}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ProfileInfoIcon src={mailIcon} alt="e-mail" />
-              <span className="truncate">{form.email}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ProfileInfoIcon src={phoneIcon} alt="telefone" />
-              <span>{form.phone || 'Telefone não informado'}</span>
-            </div>
+          <div className="w-full border-t border-border-soft pt-4">
+            <button className="btn-primary w-full" onClick={() => setIsEditing(true)}>
+              Editar Perfil
+            </button>
           </div>
-          <button className="btn-primary w-full mt-2" onClick={() => setIsEditing(true)}>
-            Editar Perfil
-          </button>
 
-          <div className="grid w-full grid-cols-2 gap-3">
+          <div className="mt-auto grid w-full grid-cols-2 gap-3 pt-2">
             <SettingsPanel
               variant="action"
               label="Acessibilidade"
@@ -444,7 +480,7 @@ export default function Perfil() {
         </Card>
 
         <div className="lg:col-span-2 flex flex-col gap-5 h-full min-h-0 overflow-hidden">
-          <Card className="flex-shrink-0">
+          <Card className="profile-contrast-card flex-shrink-0">
             <h3 className="text-card-title font-bold text-slate-800 mb-4">Permissões de Acesso</h3>
             <div className="grid grid-cols-2 gap-2">
               {permissions.map((p) => (
@@ -466,7 +502,7 @@ export default function Perfil() {
             </div>
           </Card>
 
-          <Card className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <Card className="profile-contrast-card flex-1 min-h-0 overflow-hidden flex flex-col">
             <h3 className="text-card-title font-bold text-slate-800 mb-4 flex-shrink-0">Atividade Recente</h3>
             <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-2">
               <ActivityList activities={activities} currentUser={user} />

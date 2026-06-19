@@ -378,3 +378,19 @@ html[data-colorblind='true'] .ring-text-main,
 html[data-colorblind='true'] .focus-visible\:outline-text-main:focus-visible {
   outline-color: rgb(var(--text-main)) !important;
 }
+
+/* Perfil: bordas explícitas no alto contraste */
+html[data-contrast='high'] .profile-contrast-card {
+  border-width: 2px !important;
+  border-color: rgb(var(--text-main)) !important;
+  box-shadow: 0 0 0 1px rgb(var(--bg-surface)), 0 18px 35px rgb(0 0 0 / 0.12) !important;
+}
+
+html[data-contrast='high'][data-theme='dark'] .profile-contrast-card {
+  border-color: rgb(147 197 253) !important;
+  box-shadow: 0 0 0 1px rgb(15 23 42), 0 18px 35px rgb(0 0 0 / 0.35) !important;
+}
+
+html[data-colorblind='true'] .bg-gradient-to-br {
+  filter: saturate(0.92) contrast(1.08);
+}
