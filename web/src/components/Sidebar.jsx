@@ -83,7 +83,7 @@ function UserAvatar({ user, size = 'sm' }) {
   )
 }
 
-function NavButton({ item, currentScreen, setCurrentScreen, hoveredItem, setHoveredItem }) {
+function NavButton({ item, currentScreen, setCurrentScreen }) {
   const active = currentScreen === item.id
 
   return (
@@ -91,8 +91,6 @@ function NavButton({ item, currentScreen, setCurrentScreen, hoveredItem, setHove
       key={item.id}
       type="button"
       onClick={() => setCurrentScreen(item.id)}
-      onMouseEnter={() => setHoveredItem(item.id)}
-      onMouseLeave={() => setHoveredItem(null)}
       aria-current={active ? 'page' : undefined}
       className={`
         group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-200 ease-out
@@ -124,7 +122,6 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
         }
       : null)
 
-  const [hoveredItem, setHoveredItem] = useState(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showProfilePopup, setShowProfilePopup] = useState(false)
 
@@ -171,8 +168,6 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               item={item}
               currentScreen={currentScreen}
               setCurrentScreen={setCurrentScreen}
-              hoveredItem={hoveredItem}
-              setHoveredItem={setHoveredItem}
             />
           ))}
 
@@ -189,8 +184,6 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
                     item={item}
                     currentScreen={currentScreen}
                     setCurrentScreen={setCurrentScreen}
-                    hoveredItem={hoveredItem}
-                    setHoveredItem={setHoveredItem}
                   />
                 ))}
               </div>

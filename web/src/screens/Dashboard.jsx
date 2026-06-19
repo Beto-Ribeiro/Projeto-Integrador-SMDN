@@ -22,9 +22,30 @@ import {
 } from '../backend/ocorrencias/ocorrenciasService.js'
 
 const SEVERITY_CONFIG = {
-  critical: { label: 'Crítico', cls: 'badge-critical', dotColor: '#c60202' },
-  severe: { label: 'Grave', cls: 'badge-severe', dotColor: '#ff6a00' },
-  regular: { label: 'Moderado', cls: 'badge-regular', dotColor: '#cab900' },
+  critical: { label: 'Crítico', cls: 'badge-critical', dotColor: '#c60202', shape: 'critical', symbol: '◆' },
+  severe: { label: 'Grave', cls: 'badge-severe', dotColor: '#ff6a00', shape: 'severe', symbol: '▲' },
+  regular: { label: 'Moderado', cls: 'badge-regular', dotColor: '#cab900', shape: 'regular', symbol: '●' },
+}
+
+function getSeverityColor(cfg, colorBlind = false) {
+  if (!colorBlind) return cfg.dotColor
+  const safe = {
+    critical: '#005cab',
+    severe: '#d95f02',
+    regular: '#7570b3',
+  }
+  return safe[cfg.shape] || cfg.dotColor
+}
+
+function SeverityShape({ severity, colorBlind = false, className = '' }) {
+  const cfg = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.regular
+  return (
+    <span
+      className={`severity-shape severity-shape-${cfg.shape} ${className}`}
+      style={{ '--severity-color': getSeverityColor(cfg, colorBlind) }}
+      aria-hidden="true"
+    />
+  )
 }
 
 const STATUS_MAP = {
@@ -248,6 +269,7 @@ export default function Dashboard() {
           onOccurrenceDetails={handleMapOccurrenceDetails}
           onVictimAssistance={handleVictimAssistance}
           savingVictimId={savingVictimId}
+          colorBlind={settings.colorBlind}
         />
 
         <div
@@ -369,10 +391,7 @@ export default function Dashboard() {
                       aria-label={`Abrir detalhes de ${occ.title}, severidade ${cfg.label}, ${occ.city}`}
                       className="w-full flex items-start gap-2.5 px-3 py-3 hover:bg-slate-50/80 transition-colors text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-500"
                     >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1"
-                        style={{ backgroundColor: cfg.dotColor }}
-                      />
+                      <SeverityShape severity={occ.severity} colorBlind={settings.colorBlind} className="mt-1 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-xs text-slate-800 truncate">{occ.title}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">

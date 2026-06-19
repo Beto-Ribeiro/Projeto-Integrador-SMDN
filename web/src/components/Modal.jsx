@@ -45,7 +45,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
       />
 
       <div
-        className={`relative z-10 w-full ${sizes[size]} max-h-[calc(100dvh-2rem)] bg-bg-surface rounded-[16px] shadow-modal animate-slide-up overflow-hidden flex flex-col`}
+        className={`modal-panel relative z-10 w-full ${sizes[size]} max-h-[calc(100dvh-2rem)] bg-bg-surface rounded-[16px] shadow-modal animate-slide-up overflow-hidden flex flex-col`}
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-border-soft flex-shrink-0">
           <h2 className="text-card-title font-bold text-slate-800">{title}</h2>

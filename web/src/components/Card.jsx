@@ -1,6 +1,6 @@
 const Card = ({ children, className = '', onClick, ...props }) => {
   const base =
-    'bg-bg-surface rounded-card shadow-card p-6 transition-shadow duration-200' +
+    'a11y-card bg-bg-surface rounded-card shadow-card p-6 border border-border-soft transition-shadow duration-200' +
     (onClick ? ' cursor-pointer hover:shadow-card-hover' : '')
 
   return (

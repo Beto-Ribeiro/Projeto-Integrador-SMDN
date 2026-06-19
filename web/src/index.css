@@ -394,3 +394,189 @@ html[data-contrast='high'][data-theme='dark'] .profile-contrast-card {
 html[data-colorblind='true'] .bg-gradient-to-br {
   filter: saturate(0.92) contrast(1.08);
 }
+
+/* A11Y audit: forms, buttons, cards and colorblind shapes */
+.severity-shape {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  background: var(--severity-color);
+  border: 2px solid rgb(var(--bg-surface));
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.16);
+}
+
+.severity-shape-critical {
+  transform: rotate(45deg);
+  border: 3px double rgb(var(--bg-surface));
+}
+
+.severity-shape-severe {
+  width: 0;
+  height: 0;
+  background: transparent;
+  border-left: 0.43rem solid transparent;
+  border-right: 0.43rem solid transparent;
+  border-bottom: 0.82rem solid var(--severity-color);
+  box-shadow: none;
+  filter: drop-shadow(0 0 1px rgb(var(--bg-surface)));
+}
+
+.severity-shape-regular {
+  border-radius: 999px;
+}
+
+.report-pattern-critical,
+.report-pattern-severe,
+.report-pattern-regular,
+.report-pattern-success,
+.report-pattern-main {
+  position: relative;
+  overflow: hidden;
+}
+
+.report-pattern-critical::after,
+.report-pattern-severe::after,
+.report-pattern-regular::after,
+.report-pattern-success::after,
+.report-pattern-main::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.32;
+  background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.8) 0 3px, transparent 3px 7px);
+  pointer-events: none;
+}
+
+html[data-colorblind='true'] .badge-critical::before { content: '◆ '; }
+html[data-colorblind='true'] .badge-severe::before { content: '▲ '; }
+html[data-colorblind='true'] .badge-regular::before { content: '● '; }
+html[data-colorblind='true'] .badge-success::before { content: '✓ '; }
+
+html[data-contrast='high'] .a11y-card,
+html[data-contrast='high'] .modal-panel,
+html[data-contrast='high'] .input-field,
+html[data-contrast='high'] .select-field,
+html[data-contrast='high'] [role='dialog'],
+html[data-contrast='high'] [role='region'] {
+  border-color: rgb(var(--text-main)) !important;
+  border-width: 2px !important;
+}
+
+html[data-contrast='high'][data-theme='dark'] .a11y-card,
+html[data-contrast='high'][data-theme='dark'] .modal-panel,
+html[data-contrast='high'][data-theme='dark'] .input-field,
+html[data-contrast='high'][data-theme='dark'] .select-field,
+html[data-contrast='high'][data-theme='dark'] [role='dialog'],
+html[data-contrast='high'][data-theme='dark'] [role='region'] {
+  border-color: rgb(147 197 253) !important;
+}
+
+html[data-colorblind='true'] button:not(:disabled):hover,
+html[data-colorblind='true'] a:hover,
+html[data-contrast='high'] button:not(:disabled):hover,
+html[data-contrast='high'] a:hover {
+  box-shadow: 0 0 0 2px rgb(var(--text-main) / 0.35);
+}
+
+html[data-colorblind='true'] button:disabled,
+html[data-contrast='high'] button:disabled,
+html[data-colorblind='true'] .disabled,
+html[data-contrast='high'] .disabled {
+  opacity: 0.72 !important;
+  filter: grayscale(0.25);
+  cursor: not-allowed !important;
+}
+
+html[data-colorblind='true'] a,
+html[data-colorblind='true'] .btn-ghost,
+html[data-colorblind='true'] button[class*='text-text-main'] {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+html[data-theme='dark'] .severity-shape {
+  border-color: rgb(15 23 42);
+}
+
+html[data-colorblind='true'] .severity-shape-critical,
+html[data-colorblind='true'] .smdn-occurrence-critical {
+  --severity-color: #005cab !important;
+  --marker-color: #005cab !important;
+}
+
+html[data-colorblind='true'] .severity-shape-severe,
+html[data-colorblind='true'] .smdn-occurrence-severe {
+  --severity-color: #d95f02 !important;
+  --marker-color: #d95f02 !important;
+}
+
+html[data-colorblind='true'] .severity-shape-regular,
+html[data-colorblind='true'] .smdn-occurrence-regular {
+  --severity-color: #7570b3 !important;
+  --marker-color: #7570b3 !important;
+}
+
+
+/* O Dashboard já usa formas geométricas; evita símbolo duplicado dentro das badges. */
+html[data-colorblind='true'] .badge-critical::before,
+html[data-colorblind='true'] .badge-severe::before,
+html[data-colorblind='true'] .badge-regular::before,
+html[data-colorblind='true'] .badge-success::before {
+  content: '' !important;
+}
+
+
+/* Perfil: modal de detalhes das atividades em tema escuro */
+html[data-theme='dark'] .profile-activity-details-panel {
+  background-color: rgb(15 23 42) !important;
+  border-color: rgb(51 65 85) !important;
+  color: rgb(226 232 240) !important;
+}
+
+html[data-theme='dark'] .profile-activity-details-section {
+  background-color: rgb(30 41 59 / 0.82) !important;
+  border-color: rgb(71 85 105) !important;
+}
+
+html[data-theme='dark'] .profile-activity-details-panel .text-slate-700,
+html[data-theme='dark'] .profile-activity-details-panel .text-slate-800 {
+  color: rgb(226 232 240) !important;
+}
+
+html[data-theme='dark'] .profile-activity-details-panel .text-slate-500,
+html[data-theme='dark'] .profile-activity-details-panel .text-slate-400 {
+  color: rgb(203 213 225) !important;
+}
+
+html[data-theme='dark'] .profile-activity-details-panel .hover\:bg-slate-100:hover {
+  background-color: rgb(51 65 85) !important;
+}
+
+/* Acessibilidade: reduzir animações também remove deslocamentos/escala de hover */
+html[data-motion='reduced'] .hover\:translate-x-1:hover,
+html[data-motion='reduced'] .hover\:-translate-y-0\.5:hover,
+html[data-motion='reduced'] .hover\:scale-105:hover,
+html[data-motion='reduced'] .active\:scale-95:active,
+html[data-motion='reduced'] .active\:scale-100:active,
+html[data-motion='reduced'] .group:hover .group-hover\:scale-105,
+html[data-motion='reduced'] .group:hover .group-hover\:translate-x-1,
+html[data-motion='reduced'] .group:hover .group-hover\:-translate-y-0\.5 {
+  transform: none !important;
+}
+
+html[data-motion='reduced'] .transition,
+html[data-motion='reduced'] .transition-all,
+html[data-motion='reduced'] .transition-colors,
+html[data-motion='reduced'] .transition-opacity,
+html[data-motion='reduced'] .transition-shadow,
+html[data-motion='reduced'] .transition-transform {
+  transition-property: none !important;
+  transition-duration: 0ms !important;
+}
+
+html[data-motion='reduced'] .animate-pulse,
+html[data-motion='reduced'] .animate-spin,
+html[data-motion='reduced'] .animate-ping,
+html[data-motion='reduced'] .animate-bounce {
+  animation: none !important;
+}

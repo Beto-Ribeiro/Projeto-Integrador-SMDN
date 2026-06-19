@@ -74,18 +74,6 @@ function ChangePreview({ changes }) {
   )
 }
 
-function ProfileInfoIcon({ src, alt }) {
-  return (
-    <img
-      src={src}
-      width="16"
-      height="16"
-      alt={alt}
-      className="w-4 h-4 flex-shrink-0 opacity-60"
-    />
-  )
-}
-
 function initialsFromName(name) {
   return String(name || 'SMDN')
     .split(' ')
@@ -167,7 +155,7 @@ function ActivityDetailsDialog({ details, onClose }) {
       <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-[1px]" />
 
       <div
-        className="absolute right-6 top-6 flex max-h-[calc(100vh-3rem)] w-[min(34rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl"
+        className="profile-activity-details-panel absolute right-6 top-6 flex max-h-[calc(100vh-3rem)] w-[min(34rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-3 border-b border-border-soft p-5">
@@ -197,7 +185,7 @@ function ActivityDetailsDialog({ details, onClose }) {
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {details.sections.map((section) => (
-            <div key={section.title} className="rounded-2xl border border-border-soft bg-slate-50/70 p-4">
+            <div key={section.title} className="profile-activity-details-section rounded-2xl border border-border-soft bg-slate-50/70 p-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-2">{section.title}</p>
               <div className="space-y-2">
                 {section.rows.map((row) => (

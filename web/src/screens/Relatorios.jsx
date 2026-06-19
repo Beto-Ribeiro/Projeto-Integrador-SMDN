@@ -15,6 +15,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import Card from '../components/Card'
 import externalIcon from '../assets/relatorios/external-link.svg'
 import { getRelatoriosData, subscribeRelatoriosChanges } from '../backend/relatorios/relatoriosService.js'
+import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 
 // ─── Dependências de exportação ──────────────────────────────────────────────
 // Se ainda não instalou: npm install html2canvas jspdf xlsx
@@ -128,7 +129,6 @@ async function exportToPDF(element, period) {
 
   if (exportBar) exportBar.style.visibility = ''
 
-  const imgData = canvas.toDataURL('image/png')
   const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   const pageW  = pdf.internal.pageSize.getWidth()
@@ -291,6 +291,74 @@ function exportToExcel(data, period) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTES VISUAIS (independentes dos dados)
 // ─────────────────────────────────────────────────────────────────────────────
+
+const SEVERITY_META = {
+  'Crítico': { shape: 'critical', color: '#c60202', symbol: '◆' },
+  'Grave': { shape: 'severe', color: '#ff6a00', symbol: '▲' },
+  'Moderado': { shape: 'regular', color: '#cab900', symbol: '●' },
+  'Normal': { shape: 'regular', color: '#02c602', symbol: '✓' },
+}
+
+const STATUS_META = {
+  'Resolvidas': { icon: 'check', label: 'Resolvida' },
+  'Em andamento': { icon: 'clock', label: 'Em andamento' },
+  'Pendentes': { icon: 'alert', label: 'Pendente' },
+}
+
+function MiniFeatherIcon({ type = 'circle', color = 'currentColor', className = '' }) {
+  if (type === 'check') {
+    return (
+      <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" />
+        <path d="M8 12.5l2.5 2.5L16 9" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (type === 'clock') {
+    return (
+      <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" />
+        <path d="M12 7v5l3 2" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (type === 'alert') {
+    return (
+      <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3l9 16H3L12 3Z" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+        <path d="M12 9v4M12 17h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    )
+  }
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="2" />
+    </svg>
+  )
+}
+
+function SeverityLegendLabel({ item }) {
+  const meta = SEVERITY_META[item.label] || SEVERITY_META.Moderado
+  return (
+    <span className={`inline-flex items-center gap-1.5 font-bold ${item.text}`}>
+      <span className="inline-flex w-4 justify-center text-base leading-none" style={{ color: meta.color }} aria-hidden="true">
+        {meta.symbol}
+      </span>
+      {item.label}
+    </span>
+  )
+}
+
+function StatusLegendLabel({ item }) {
+  const meta = STATUS_META[item.label] || { icon: 'circle' }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
+      <MiniFeatherIcon type={meta.icon} color={item.color} />
+      {item.label}
+    </span>
+  )
+}
+
 const TYPE_COLORS = [
   'bg-text-main',
   'bg-status-severe',
@@ -318,6 +386,19 @@ function buildDonutSegments(items) {
   })
 }
 
+
+function getAccessibleStatusRows(rows, colorBlind = false) {
+  if (!colorBlind) return rows
+
+  const safe = {
+    Resolvidas: '#1b9e77',
+    'Em andamento': '#d95f02',
+    Pendentes: '#005cab',
+  }
+
+  return rows.map((row) => ({ ...row, color: safe[row.label] || row.color }))
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────────────────────────────────────
@@ -327,10 +408,12 @@ export default function Relatorios() {
   const reportRef                 = useRef(null)
 
   const { loading, error, data } = useReportData(period)
+  const { settings } = useSmdnSettings()
+  const accessibleStatus = getAccessibleStatusRows(data.byStatus, settings.colorBlind)
 
   const maxTotal = Math.max(1, ...data.monthly.map((m) => m.total))
   const maxCity  = Math.max(1, ...data.byCity.map((c) => c.count))
-  const donutSegments = buildDonutSegments(data.byStatus)
+  const donutSegments = buildDonutSegments(accessibleStatus)
 
   // ── Handlers de exportação ─────────────────────────────────────────────────
   const handleExportPDF = useCallback(async () => {
@@ -466,7 +549,7 @@ export default function Relatorios() {
                       style={{ height: `${(m.total / maxTotal) * 100}%` }}
                     >
                       <div
-                        className="w-full bg-status-critical rounded-t"
+                        className="w-full bg-status-critical rounded-t report-pattern-critical"
                         style={{ height: `${m.total > 0 ? (m.critical / m.total) * 100 : 0}%` }}
                       />
                     </div>
@@ -477,12 +560,12 @@ export default function Relatorios() {
             </div>
             <div className="flex items-center gap-5 mt-4">
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-text-main/20 block" />
+                <span className="w-3 h-3 rounded-sm bg-text-main/20 report-pattern-main block" />
                 <span className="text-xs text-slate-500">Total</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-status-critical block" />
-                <span className="text-xs text-slate-500">Críticos</span>
+                <span className="w-3 h-3 rounded-sm bg-status-critical report-pattern-critical block" />
+                <span className="text-xs text-slate-500">◆ Críticos</span>
               </div>
             </div>
           </Card>
@@ -501,7 +584,7 @@ export default function Relatorios() {
                   </div>
                   <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${TYPE_COLORS[i]}`}
+                      className={`h-full rounded-full ${TYPE_COLORS[i]} report-pattern-main`}
                       style={{ width: `${t.pct}%`, transition: 'width 0.6s ease' }}
                     />
                   </div>
@@ -519,14 +602,14 @@ export default function Relatorios() {
               {data.bySeverity.map((s) => (
                 <div key={s.label}>
                   <div className="flex justify-between text-xs mb-1.5">
-                    <span className={`font-bold ${s.text}`}>{s.label}</span>
+                    <SeverityLegendLabel item={s} />
                     <span className="text-slate-400 font-bold">
                       {s.count} <span className="text-slate-300">({s.pct}%)</span>
                     </span>
                   </div>
                   <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${s.color}`}
+                      className={`h-full rounded-full ${s.color} report-pattern-main`}
                       style={{ width: `${s.pct}%`, transition: 'width 0.7s ease' }}
                     />
                   </div>
@@ -571,18 +654,15 @@ export default function Relatorios() {
                 </div>
               </div>
               <div className="flex-1 space-y-4">
-                {data.byStatus.map((s) => (
+                {accessibleStatus.map((s) => (
                   <div key={s.label}>
                     <div className="flex justify-between text-xs mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-                        <span className="text-slate-600 font-medium">{s.label}</span>
-                      </div>
+                      <StatusLegendLabel item={s} />
                       <span className="font-bold text-slate-700">{s.count}</span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full"
+                        className="h-full rounded-full report-pattern-main"
                         style={{
                           width:           `${s.pct}%`,
                           backgroundColor: s.color,
