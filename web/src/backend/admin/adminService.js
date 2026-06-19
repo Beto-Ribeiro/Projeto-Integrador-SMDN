@@ -52,6 +52,37 @@ async function safeUserActivity(payload) {
   }
 }
 
+async function syncAuthEmailByAdmin(userId, email) {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!userId || !cleanEmail) return null
+
+  const { data, error } = await supabase.rpc('admin_update_auth_email', {
+    p_user_id: userId,
+    p_new_email: cleanEmail,
+  })
+
+  if (error) {
+    throw new Error(`Não foi possível atualizar o e-mail real de login: ${error.message}`)
+  }
+
+  return data
+}
+
+async function sendPasswordResetEmail(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!cleanEmail) return null
+
+  const { data, error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+    redirectTo: window.location.origin,
+  })
+
+  if (error) {
+    throw new Error(`A solicitação foi aprovada, mas não foi possível enviar o e-mail de redefinição de senha: ${error.message}`)
+  }
+
+  return data
+}
+
 export async function listAccessRequests() {
   const { data, error } = await supabase
     .from('Solicitacao_Acesso_Web')
@@ -132,6 +163,7 @@ export async function rejectAccessRequest(requestId, observation = '') {
     entity_type: 'Solicitacao_Acesso_Web',
     entity_id: requestId,
     detail: observation || 'Solicitação de acesso recusada.',
+    metadata: { reason: observation || 'Solicitação de acesso recusada.' },
   })
 
   return data
@@ -175,8 +207,18 @@ export async function approveProfileChangeRequest(request) {
     if (profileError) throw profileError
   }
 
+  let authEmailResult = null
+  if (changes.email?.new) {
+    authEmailResult = await syncAuthEmailByAdmin(request.sap_user_id, changes.email.new)
+  }
+
+  const resetTargetEmail = authEmailResult?.newEmail || changes.email?.new || request.sap_email_solicitante
+  if (changes.password) {
+    await sendPasswordResetEmail(resetTargetEmail)
+  }
+
   const passwordMessage = changes.password
-    ? ' Solicitação de senha marcada como aprovada; redefina a senha manualmente no Supabase Auth se necessário.'
+    ? ' E-mail de redefinição de senha enviado para o usuário.'
     : ''
 
   const { data, error } = await supabase
@@ -212,7 +254,7 @@ export async function approveProfileChangeRequest(request) {
     entity_type: 'Solicitacao_Alteracao_Perfil',
     entity_id: request.sap_id,
     detail: `Alteração de perfil aprovada para ${request.sap_nome_solicitante || request.sap_email_solicitante || request.sap_user_id}.${passwordMessage}`,
-    metadata: { actorName, changes },
+    metadata: { actorName, changes, authEmailUpdated: authEmailResult, passwordResetEmailSentTo: changes.password ? resetTargetEmail : null },
   })
 
   return data
@@ -235,13 +277,30 @@ export async function rejectProfileChangeRequest(request, observation = '') {
 
   if (error) throw error
 
+  const actorName = await getProfileName(actorUserId)
+  const reason = observation || 'Alteração de perfil recusada.'
+
+  await safeUserActivity({
+    atu_user_id: request.sap_user_id,
+    atu_actor_id: actorUserId,
+    atu_action: 'Alteração recusada pelo administrador',
+    atu_detail: `Solicitação de alteração recusada por ${actorName}. Motivo: ${reason}`,
+    atu_metadata: {
+      actorName,
+      actorIsTarget: actorUserId === request.sap_user_id,
+      targetName: request.sap_nome_solicitante,
+      reason,
+      changes: changesToActivityList(request.sap_alteracoes || {}),
+    },
+  })
+
   await safeAuditLog({
     actor_user_id: actorUserId,
     action: 'profile_change_rejected',
     entity_type: 'Solicitacao_Alteracao_Perfil',
     entity_id: request.sap_id,
-    detail: observation || 'Alteração de perfil recusada.',
-    metadata: { changes: request.sap_alteracoes || {} },
+    detail: reason,
+    metadata: { actorName, reason, changes: request.sap_alteracoes || {} },
   })
 
   return data

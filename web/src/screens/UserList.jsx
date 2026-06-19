@@ -66,6 +66,17 @@ function isBlockedWebType(type) {
   return ['pendente', 'sem perfil', 'semperfil', 'cidadao', 'cidada', 'citizen', 'unknown'].includes(normalizedType)
 }
 
+function hasAnyGrantedPermission(permissions) {
+  return Object.entries(DEFAULT_PERMISSIONS).some(([key]) => Boolean(permissions?.[key]))
+}
+
+function userAccessSummary(user) {
+  if (isBlockedWebType(user?.prf_tipo)) return null
+  const permissions = permissionsForType(user?.prf_permissoes, user?.prf_tipo)
+  if (!hasAnyGrantedPermission(permissions)) return 'Acesso ao login, sem módulos'
+  return 'Tem acesso'
+}
+
 function allPermissions(value) {
   return Object.keys(DEFAULT_PERMISSIONS).reduce((acc, key) => ({ ...acc, [key]: value }), {})
 }
@@ -307,7 +318,14 @@ export default function UserList() {
                 <Avatar user={user} />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-slate-800 truncate">{user.prf_nome || 'Usuário sem nome'}</p>
-                  <p className="text-xs text-slate-400 truncate">{roleLabel(user.prf_tipo)}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-slate-400 truncate">{roleLabel(user.prf_tipo)}</p>
+                    {userAccessSummary(user) && (
+                      <span className="rounded-full border border-status-success/30 bg-status-success-bg px-2 py-0.5 text-[10px] font-bold text-status-success">
+                        {userAccessSummary(user)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="hidden md:block min-w-[220px] text-sm text-slate-500">
                   <p className="truncate">{user.prf_email_contato || 'Sem e-mail de contato'}</p>
@@ -336,35 +354,50 @@ export default function UserList() {
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2"><label className="block text-label text-slate-600 mb-1.5">NOME COMPLETO</label><input className="input-field" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></div>
             <div><label className="block text-label text-slate-600 mb-1.5">TIPO DE PERFIL</label><select className="input-field" value={form.type} onChange={(event) => handleTypeChange(event.target.value)}><option value="pendente">Sem perfil</option><option value="funcionario">Funcionário</option><option value="instituicao">Instituição</option><option value="cidadao">Cidadão</option><option value="administrador">Administrador</option></select></div>
-            <div><label className="block text-label text-slate-600 mb-1.5">E-MAIL DE CONTATO</label><input type="email" className="input-field" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></div>
+            <div><label className="block text-label text-slate-600 mb-1.5">E-MAIL DE LOGIN / CONTATO</label><input type="email" className="input-field" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></div>
             <div><label className="block text-label text-slate-600 mb-1.5">TELEFONE</label><input className="input-field" inputMode="numeric" maxLength={15} value={form.phone} placeholder="(12) 98703-7110" onChange={(event) => setForm((current) => ({ ...current, phone: formatBrazilPhone(event.target.value) }))} /></div>
             <div><label className="block text-label text-slate-600 mb-1.5">FOTO DO PERFIL</label><label className="input-field flex items-center justify-between cursor-pointer text-slate-500"><span className="truncate">{uploadingAvatar ? 'Enviando foto...' : form.avatarUrl ? 'Trocar foto' : 'Enviar foto'}</span><input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar} onChange={handleAvatarFileChange} /></label></div>
             <div className="col-span-2"><label className="block text-label text-slate-600 mb-1.5">URL DA FOTO</label><input className="input-field" value={form.avatarUrl} placeholder="Será preenchida automaticamente após upload" onChange={(event) => setForm((current) => ({ ...current, avatarUrl: event.target.value }))} /></div>
           </div>
 
           <div className="rounded-2xl border border-border-soft p-4">
-            <h3 className="font-bold text-slate-800 mb-3">Permissões do usuário</h3>
-            <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-              Sem perfil e Cidadão não acessam o painel web. Funcionário e Instituição acessam o sistema, mas não acessam Administração. Administrador acessa tudo.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {Object.entries(PERMISSION_LABELS).map(([key, label]) => {
-                const blockedType = isBlockedWebType(form.type)
-                const disabled = blockedType || (key === 'admin' && !isAdminType(form.type))
-
-                return (
-                  <label key={key} className={`flex items-center gap-2 text-sm ${disabled ? 'text-slate-400' : 'text-slate-600'}`}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.permissions?.[key])}
-                      disabled={disabled}
-                      onChange={() => togglePermission(key)}
-                    />
-                    {label}
-                  </label>
-                )
-              })}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-bold text-slate-800">Permissões do usuário</h3>
+              {!isBlockedWebType(form.type) && (
+                <span className="rounded-full border border-status-success/30 bg-status-success-bg px-3 py-1 text-xs font-bold text-status-success">
+                  Tem acesso ao painel web
+                </span>
+              )}
             </div>
+
+            {isBlockedWebType(form.type) ? (
+              <div className="rounded-xl border border-border-soft bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Este tipo de perfil não acessa o painel web. Nenhuma permissão de módulo será exibida ou aplicada.
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+                  Marque apenas os módulos que este usuário pode abrir. Funcionário e Instituição não acessam Administração.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {Object.entries(PERMISSION_LABELS).map(([key, label]) => {
+                    const disabled = key === 'admin' && !isAdminType(form.type)
+
+                    return (
+                      <label key={key} className={`flex items-center gap-2 text-sm ${disabled ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.permissions?.[key])}
+                          disabled={disabled}
+                          onChange={() => togglePermission(key)}
+                        />
+                        {label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="rounded-2xl border border-border-soft p-4">
@@ -379,8 +412,8 @@ export default function UserList() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-yellow-100 bg-yellow-50 px-4 py-3 text-xs text-yellow-800 leading-relaxed">
-            Trocar senha ou e-mail real de login ainda deve ser feito pelo Supabase Authentication.
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800 leading-relaxed">
+            Alterar o e-mail aqui também atualiza o e-mail real de login no Supabase Auth. Solicitações de senha aprovadas enviam e-mail de redefinição ao usuário.
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-border-soft">

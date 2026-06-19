@@ -253,6 +253,14 @@ function makeRow(label, value) {
   return { label, value: clean(value) }
 }
 
+function removeReasonFromDetail(detail, reason) {
+  if (!detail || !reason) return detail
+  return String(detail)
+    .replace(` Motivo: ${reason}`, '')
+    .replace(`Motivo: ${reason}`, '')
+    .trim()
+}
+
 function buildChangesRows(changes = []) {
   return changes.map((change) => ({
     label: clean(change.label || change.key, 'Campo'),
@@ -272,16 +280,25 @@ export function getActivityDetails(activity, currentUser) {
     avatar: actorProfile.prf_avatar_url || actor.avatar || null,
   }
 
+  const detailSummary = removeReasonFromDetail(activity?.atu_detail, metadata.reason) || formatUserActivity(activity, currentUser)
+
   const sections = [
     {
       title: 'Registro',
       rows: [
         makeRow('Ação', activity?.atu_action),
-        makeRow('Resumo', activity?.atu_detail || formatUserActivity(activity, currentUser)),
+        makeRow('Resumo', detailSummary),
         makeRow('Data', formatDateTime(activity?.atu_created_at)),
       ],
     },
   ]
+
+  if (metadata.reason) {
+    sections.push({
+      title: 'Motivo da recusa',
+      rows: [makeRow('Motivo', metadata.reason)],
+    })
+  }
 
   if (metadata.kind === 'login') {
     sections.push({

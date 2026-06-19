@@ -183,15 +183,15 @@ function ActivityDetailsDialog({ details, onClose }) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4">
           {details.sections.map((section) => (
             <div key={section.title} className="profile-activity-details-section rounded-2xl border border-border-soft bg-slate-50/70 p-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-2">{section.title}</p>
               <div className="space-y-2">
                 {section.rows.map((row) => (
-                  <div key={`${section.title}-${row.label}`} className="grid grid-cols-[120px_1fr] gap-3 text-sm">
+                  <div key={`${section.title}-${row.label}`} className="grid min-w-0 grid-cols-[120px_minmax(0,1fr)] gap-3 text-sm">
                     <span className="font-semibold text-slate-500">{row.label}</span>
-                    <span className="text-slate-700 break-words">{row.value}</span>
+                    <span className="profile-activity-detail-value min-w-0 break-all text-slate-700">{row.value}</span>
                   </div>
                 ))}
               </div>
@@ -260,7 +260,7 @@ function ActivityList({ activities, currentUser }) {
 }
 
 export default function Perfil() {
-  const { user, setUser, isAdmin, signOut } = useAuth()
+  const { user, setUser, isAdmin, signOut, recoveryMode, clearRecoveryMode } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState(makeInitialForm(user))
   const [activities, setActivities] = useState([])
@@ -270,6 +270,8 @@ export default function Perfil() {
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [showPrivateDetails, setShowPrivateDetails] = useState(false)
+  const [recoveryPassword, setRecoveryPassword] = useState('')
+  const [recoverySaving, setRecoverySaving] = useState(false)
 
   useEffect(() => {
     setForm(makeInitialForm(user))
@@ -333,6 +335,11 @@ export default function Perfil() {
     }))
   }, [isAdmin, user?.permissions, user?.perfil?.prf_permissoes])
 
+  const grantedPermissions = useMemo(
+    () => permissions.filter((permission) => permission.granted),
+    [permissions]
+  )
+
 
   async function handleAvatarFileChange(event) {
     const file = event.target.files?.[0]
@@ -349,6 +356,32 @@ export default function Perfil() {
     } finally {
       setUploadingAvatar(false)
       event.target.value = ''
+    }
+  }
+
+  const handleRecoveryPasswordSave = async () => {
+    const cleanPassword = String(recoveryPassword || '')
+    if (cleanPassword.length < 6) {
+      setError('A nova senha precisa ter pelo menos 6 caracteres.')
+      return
+    }
+
+    setRecoverySaving(true)
+    setError('')
+
+    try {
+      const { error: passwordError } = await supabase.auth.updateUser({ password: cleanPassword })
+      if (passwordError) throw passwordError
+
+      clearRecoveryMode?.()
+      setRecoveryPassword('')
+      setNotice('Senha atualizada com sucesso.')
+      setSaved(true)
+      setTimeout(() => setSaved(false), 4000)
+    } catch (err) {
+      setError(err.message || 'Não foi possível atualizar a senha.')
+    } finally {
+      setRecoverySaving(false)
     }
   }
 
@@ -469,25 +502,33 @@ export default function Perfil() {
 
         <div className="lg:col-span-2 flex flex-col gap-5 h-full min-h-0 overflow-hidden">
           <Card className="profile-contrast-card flex-shrink-0">
-            <h3 className="text-card-title font-bold text-slate-800 mb-4">Permissões de Acesso</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {permissions.map((p) => (
-                <div key={p.key} className="flex items-center gap-2 text-sm">
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${p.granted ? 'bg-status-success-bg' : 'bg-slate-100'}`}>
-                    {p.granted ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-card-title font-bold text-slate-800">Permissões de Acesso</h3>
+              {grantedPermissions.length > 0 && (
+                <span className="rounded-full border border-status-success/30 bg-status-success-bg px-3 py-1 text-xs font-bold text-status-success">
+                  Tem acesso
+                </span>
+              )}
+            </div>
+
+            {grantedPermissions.length === 0 ? (
+              <div className="rounded-xl border border-border-soft bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Nenhum módulo do painel foi liberado para este perfil.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {grantedPermissions.map((p) => (
+                  <div key={p.key} className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 bg-status-success-bg">
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                         <path d="M2 5l2 2 4-4" stroke="#02c602" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
-                    ) : (
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M3 3l4 4M7 3L3 7" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className={p.granted ? 'text-slate-700' : 'text-slate-400'}>{p.label}</span>
-                </div>
-              ))}
-            </div>
+                    </span>
+                    <span className="text-slate-700">{p.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           <Card className="profile-contrast-card flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -498,6 +539,36 @@ export default function Perfil() {
           </Card>
         </div>
       </div>
+
+      <Modal isOpen={Boolean(recoveryMode)} onClose={() => {}} title="Definir nova senha" size="sm">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 leading-relaxed">
+            Você abriu um link de redefinição de senha. Digite uma nova senha para concluir.
+          </div>
+
+          {error && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-label text-slate-600 mb-1.5">NOVA SENHA</label>
+            <input
+              type="password"
+              className="input-field"
+              value={recoveryPassword}
+              placeholder="Mínimo 6 caracteres"
+              onChange={(event) => setRecoveryPassword(event.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <button className="btn-primary w-full" onClick={handleRecoveryPasswordSave} disabled={recoverySaving}>
+            {recoverySaving ? 'Atualizando...' : 'Atualizar senha'}
+          </button>
+        </div>
+      </Modal>
 
       <Modal isOpen={isEditing} onClose={() => setIsEditing(false)} title="Editar Perfil" size="md">
         <div className="space-y-4">

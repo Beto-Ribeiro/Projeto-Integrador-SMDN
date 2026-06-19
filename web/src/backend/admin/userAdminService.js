@@ -104,6 +104,22 @@ function makeAdminAlias(name, fallbackId) {
   return `${base || String(fallbackId || 'admin').slice(0, 8)}-admin`
 }
 
+async function syncAuthEmailByAdmin({ userId, email }) {
+  const cleanEmail = normalize(email).toLowerCase()
+  if (!userId || !cleanEmail) return null
+
+  const { data, error } = await supabase.rpc('admin_update_auth_email', {
+    p_user_id: userId,
+    p_new_email: cleanEmail,
+  })
+
+  if (error) {
+    throw new Error(`Perfil salvo, mas não foi possível atualizar o e-mail de login: ${error.message}`)
+  }
+
+  return data
+}
+
 async function syncAdministratorBinding({ userId, profileType, name }) {
   const normalizedType = normalizeProfileType(profileType)
 
@@ -229,6 +245,10 @@ export async function updateUserProfileByAdmin({ user, form, actorUser }) {
     profileType: data.prf_tipo,
     name: data.prf_nome,
   })
+
+  if (normalize(before.prf_email_contato).toLowerCase() !== normalize(data.prf_email_contato).toLowerCase() && data.prf_email_contato) {
+    await syncAuthEmailByAdmin({ userId: user.prf_id, email: data.prf_email_contato })
+  }
 
   const changes = buildChanges(before, data)
   const detail = actorUserId === user.prf_id

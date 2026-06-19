@@ -580,3 +580,43 @@ html[data-motion='reduced'] .animate-ping,
 html[data-motion='reduced'] .animate-bounce {
   animation: none !important;
 }
+
+/* Logout modal: mantém ícone e botão visíveis nos dois temas */
+.logout-confirm-icon-img {
+  filter: brightness(0) saturate(100%) invert(30%) sepia(42%) saturate(829%) hue-rotate(163deg) brightness(89%) contrast(88%);
+}
+
+html[data-theme='dark'] .logout-confirm-icon-img {
+  filter: brightness(0) saturate(100%) invert(80%) sepia(16%) saturate(611%) hue-rotate(169deg) brightness(96%) contrast(91%);
+}
+
+/* Sidebar notifications */
+.notification-badge {
+  background: #dc2626;
+  color: #fff;
+  box-shadow: 0 0 0 2px rgb(var(--bg-sidebar));
+}
+
+html[data-colorblind='true'] .notification-badge {
+  background: #7c3aed;
+  color: #fff;
+}
+
+/* Perfil: impede URLs longas de estourarem o popup de atividades */
+.profile-activity-detail-value {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Admin: prévia de troca de avatar respeita tema escuro */
+html[data-theme='dark'] .admin-avatar-change-card {
+  background-color: rgb(30 41 59 / 0.82) !important;
+  border-color: rgb(71 85 105) !important;
+  color: rgb(226 232 240) !important;
+}
+
+html[data-theme='dark'] .admin-avatar-change-card .text-slate-400,
+html[data-theme='dark'] .admin-avatar-change-card .text-slate-600,
+html[data-theme='dark'] .admin-avatar-change-card .text-slate-700 {
+  color: rgb(203 213 225) !important;
+}

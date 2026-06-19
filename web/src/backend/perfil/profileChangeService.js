@@ -125,6 +125,19 @@ export async function updateOwnProfileDirect({ currentUser, form, newPassword = 
 
   if (error) throw error
 
+  const nextEmail = normalize(payload.prf_email_contato).toLowerCase()
+  const currentAuthEmail = normalize(currentUser.email).toLowerCase()
+  if (nextEmail && nextEmail !== currentAuthEmail) {
+    const { error: authEmailError } = await supabase.rpc('admin_update_auth_email', {
+      p_user_id: currentUser.id,
+      p_new_email: nextEmail,
+    })
+
+    if (authEmailError) {
+      throw new Error(`Perfil salvo, mas não foi possível atualizar o e-mail de login: ${authEmailError.message}`)
+    }
+  }
+
   const changes = buildProfileChanges({ currentUser, form })
   const activityChanges = changesToActivityList(changes)
 

@@ -45,19 +45,42 @@ function getDevBypassFlags() {
 }
 
 export default function App() {
-  const { isAuthenticated, loading, isAdmin, signIn, signOut } = useAuth()
+  const { isAuthenticated, loading, isAdmin, user, recoveryMode, signIn, signOut } = useAuth()
   const [currentScreen, setCurrentScreen] = useState('dashboard')
   const [loginView, setLoginView] = useState('login')
 
   const { devBypassAuth, devBypassAdmin } = getDevBypassFlags()
   const canRenderApp = isAuthenticated || devBypassAuth
   const canOpenAdmin = isAdmin || devBypassAdmin
+  const permissions = user?.permissions || {}
+
+  function canOpenScreen(screenId) {
+    if (screenId === 'perfil') return true
+    if (['admin', 'users'].includes(screenId)) return canOpenAdmin
+    if (devBypassAuth) return true
+
+    const permissionKeyByScreen = {
+      dashboard: 'dashboard',
+      reportar: 'reportar',
+      ocorrencias: 'ocorrencias',
+      relatorios: 'relatorios',
+      auditoria: 'auditoria',
+    }
+
+    const permissionKey = permissionKeyByScreen[screenId]
+    return permissionKey ? Boolean(permissions[permissionKey]) : false
+  }
 
   useEffect(() => {
-    if (['admin', 'users'].includes(currentScreen) && !canOpenAdmin) {
-      setCurrentScreen('dashboard')
+    if (recoveryMode) {
+      setCurrentScreen('perfil')
+      return
     }
-  }, [currentScreen, canOpenAdmin])
+
+    if (!canOpenScreen(currentScreen)) {
+      setCurrentScreen(canOpenScreen('dashboard') ? 'dashboard' : 'perfil')
+    }
+  }, [currentScreen, canOpenAdmin, devBypassAuth, recoveryMode, permissions.dashboard, permissions.reportar, permissions.ocorrencias, permissions.relatorios, permissions.auditoria])
 
   const handleLogin = async ({ email, password }) => {
     await signIn({ email, password })

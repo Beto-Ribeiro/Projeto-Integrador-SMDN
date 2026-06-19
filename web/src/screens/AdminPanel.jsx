@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Modal from '../components/Modal.jsx'
 import {
   approveAccessRequest,
   approveProfileChangeRequest,
@@ -43,25 +44,57 @@ function StatusPill({ status }) {
   )
 }
 
-function ChangeList({ changes }) {
+function ChangeList({ changes, currentProfile }) {
   const entries = Object.entries(changes || {})
   if (entries.length === 0) return <span className="text-slate-400">—</span>
 
   return (
-    <div className="space-y-1 max-w-xl">
-      {entries.map(([key, change]) => (
-        <div key={key} className="text-xs text-slate-600 leading-relaxed">
-          <span className="font-bold text-slate-700">{change.label || key}:</span>{' '}
-          <span className="text-slate-400">{change.old || '—'}</span>{' '}
-          <span>→</span>{' '}
-          <span className="font-semibold text-slate-700">{change.new || '—'}</span>
-          {change.manualOnly && (
-            <span className="ml-2 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 border border-orange-100">
-              manual
-            </span>
-          )}
-        </div>
-      ))}
+    <div className="space-y-2 max-w-xl">
+      {entries.map(([key, change]) => {
+        if (key === 'avatar') {
+          const currentAvatar = currentProfile?.prf_avatar_url
+          const nextAvatar = change.value || change.newValue || change.new
+
+          return (
+            <div key={key} className="admin-avatar-change-card rounded-xl border border-border-soft bg-slate-50/70 p-2 text-xs text-slate-600">
+              <p className="mb-2 font-bold text-slate-700">{change.label || 'Foto do perfil'}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Atual</span>
+                  {currentAvatar ? (
+                    <img src={currentAvatar} alt="Foto atual" className="h-10 w-10 rounded-full border border-border-soft object-cover" />
+                  ) : (
+                    <span className="rounded-full border border-border-soft px-2 py-1 text-[10px] text-slate-400">sem foto</span>
+                  )}
+                </div>
+                <span className="text-slate-400">→</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Solicitada</span>
+                  {nextAvatar ? (
+                    <img src={nextAvatar} alt="Nova foto solicitada" className="h-10 w-10 rounded-full border border-border-soft object-cover" />
+                  ) : (
+                    <span className="rounded-full border border-border-soft px-2 py-1 text-[10px] text-slate-400">sem foto</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        return (
+          <div key={key} className="text-xs text-slate-600 leading-relaxed">
+            <span className="font-bold text-slate-700">{change.label || key}:</span>{' '}
+            <span className="text-slate-400">{change.old || '—'}</span>{' '}
+            <span>→</span>{' '}
+            <span className="font-semibold text-slate-700">{change.new || '—'}</span>
+            {change.manualOnly && (
+              <span className="ml-2 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 border border-orange-100">
+                manual
+              </span>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -77,6 +110,8 @@ export default function AdminPanel({ initialTab = 'all' }) {
   const [actionLoading, setActionLoading] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [rejectDialog, setRejectDialog] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   async function loadAdminData() {
     setLoading(true)
@@ -120,6 +155,10 @@ export default function AdminPanel({ initialTab = 'all' }) {
     return { pending, approved, rejected, profiles: profiles.length, logs: logs.length }
   }, [requests, profileRequests, profiles, logs])
 
+  const profileMap = useMemo(() => {
+    return new Map(profiles.map((profile) => [profile.prf_id, profile]))
+  }, [profiles])
+
   const allSolicitations = useMemo(() => {
     const accessItems = requests.map((request) => ({
       id: `access-${request.saw_id}`,
@@ -143,10 +182,11 @@ export default function AdminPanel({ initialTab = 'all' }) {
       status: request.sap_status,
       createdAt: request.sap_created_at,
       changes: request.sap_alteracoes,
+      currentProfile: profileMap.get(request.sap_user_id),
     }))
 
     return [...accessItems, ...profileItems].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-  }, [requests, profileRequests])
+  }, [requests, profileRequests, profileMap])
 
   async function handleApproveAccess(request) {
     setActionLoading(request.saw_id)
@@ -164,14 +204,33 @@ export default function AdminPanel({ initialTab = 'all' }) {
     }
   }
 
-  async function handleRejectAccess(request) {
-    setActionLoading(request.saw_id)
+  function openRejectDialog(type, request) {
+    setRejectDialog({ type, request })
+    setRejectReason('')
+    setError('')
+    setMessage('')
+  }
+
+  async function handleConfirmReject() {
+    if (!rejectDialog) return
+
+    const reason = rejectReason.trim() || 'Recusado pelo painel administrativo.'
+    const id = rejectDialog.type === 'access' ? rejectDialog.request.saw_id : rejectDialog.request.sap_id
+    setActionLoading(id)
     setError('')
     setMessage('')
 
     try {
-      await rejectAccessRequest(request.saw_id, 'Recusado pelo painel administrativo.')
-      setMessage('Solicitação de acesso recusada.')
+      if (rejectDialog.type === 'access') {
+        await rejectAccessRequest(rejectDialog.request.saw_id, reason)
+        setMessage('Solicitação de acesso recusada com motivo registrado.')
+      } else {
+        await rejectProfileChangeRequest(rejectDialog.request, reason)
+        setMessage('Alteração de perfil recusada com motivo registrado.')
+      }
+
+      setRejectDialog(null)
+      setRejectReason('')
       await loadAdminData()
     } catch (err) {
       setError(err.message || 'Não foi possível recusar a solicitação.')
@@ -190,28 +249,12 @@ export default function AdminPanel({ initialTab = 'all' }) {
       const hasPasswordRequest = Boolean(request.sap_alteracoes?.password)
       setMessage(
         hasPasswordRequest
-          ? 'Alteração de perfil aprovada. A solicitação de senha foi marcada; redefina a senha manualmente no Supabase Auth se necessário.'
+          ? 'Alteração de perfil aprovada. E-mail de redefinição de senha enviado ao usuário.'
           : 'Alteração de perfil aprovada.'
       )
       await loadAdminData()
     } catch (err) {
       setError(err.message || 'Não foi possível aprovar a alteração de perfil.')
-    } finally {
-      setActionLoading('')
-    }
-  }
-
-  async function handleRejectProfile(request) {
-    setActionLoading(request.sap_id)
-    setError('')
-    setMessage('')
-
-    try {
-      await rejectProfileChangeRequest(request, 'Recusado pelo painel administrativo.')
-      setMessage('Alteração de perfil recusada.')
-      await loadAdminData()
-    } catch (err) {
-      setError(err.message || 'Não foi possível recusar a alteração de perfil.')
     } finally {
       setActionLoading('')
     }
@@ -308,7 +351,7 @@ export default function AdminPanel({ initialTab = 'all' }) {
                   <tr key={item.id} className="hover:bg-slate-50/60 align-top">
                     <td className="px-5 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{item.type}</span></td>
                     <td className="px-5 py-4"><p className="font-semibold text-slate-700">{item.requesterName || '—'}</p><p className="text-xs text-slate-400">{item.requesterEmail || '—'}</p></td>
-                    <td className="px-5 py-4 text-slate-600">{item.source === 'profile' ? <ChangeList changes={item.changes} /> : item.details}</td>
+                    <td className="px-5 py-4 text-slate-600">{item.source === 'profile' ? <ChangeList changes={item.changes} currentProfile={item.currentProfile} /> : item.details}</td>
                     <td className="px-5 py-4"><StatusPill status={item.status} /></td>
                     <td className="px-5 py-4 text-slate-500">{formatDate(item.createdAt)}</td>
                     <td className="px-5 py-4">
@@ -316,12 +359,12 @@ export default function AdminPanel({ initialTab = 'all' }) {
                         {item.source === 'profile' ? (
                           <>
                             <button disabled={item.status !== 'pendente' || actionLoading === item.raw.sap_id} onClick={() => handleApproveProfile(item.raw)} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Aprovar</button>
-                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.sap_id} onClick={() => handleRejectProfile(item.raw)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
+                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.sap_id} onClick={() => openRejectDialog('profile', item.raw)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
                           </>
                         ) : (
                           <>
                             <button disabled={item.status !== 'pendente' || actionLoading === item.raw.saw_id} onClick={() => handleApproveAccess(item.raw)} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Aprovar</button>
-                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.saw_id} onClick={() => handleRejectAccess(item.raw)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
+                            <button disabled={item.status !== 'pendente' || actionLoading === item.raw.saw_id} onClick={() => openRejectDialog('access', item.raw)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
                           </>
                         )}
                       </div>
@@ -358,7 +401,7 @@ export default function AdminPanel({ initialTab = 'all' }) {
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
                         <button disabled={request.saw_status !== 'pendente' || actionLoading === request.saw_id} onClick={() => handleApproveAccess(request)} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Aprovar</button>
-                        <button disabled={request.saw_status !== 'pendente' || actionLoading === request.saw_id} onClick={() => handleRejectAccess(request)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
+                        <button disabled={request.saw_status !== 'pendente' || actionLoading === request.saw_id} onClick={() => openRejectDialog('access', request)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
                       </div>
                     </td>
                   </tr>
@@ -385,13 +428,13 @@ export default function AdminPanel({ initialTab = 'all' }) {
                 {profileRequests.map((request) => (
                   <tr key={request.sap_id} className="hover:bg-slate-50/60 align-top">
                     <td className="px-5 py-4"><p className="font-semibold text-slate-700">{request.sap_nome_solicitante || '—'}</p><p className="text-xs text-slate-400">{request.sap_email_solicitante || request.sap_user_id}</p></td>
-                    <td className="px-5 py-4"><ChangeList changes={request.sap_alteracoes} /></td>
+                    <td className="px-5 py-4"><ChangeList changes={request.sap_alteracoes} currentProfile={profileMap.get(request.sap_user_id)} /></td>
                     <td className="px-5 py-4"><StatusPill status={request.sap_status} /></td>
                     <td className="px-5 py-4 text-slate-500">{formatDate(request.sap_created_at)}</td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
                         <button disabled={request.sap_status !== 'pendente' || actionLoading === request.sap_id} onClick={() => handleApproveProfile(request)} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Aprovar</button>
-                        <button disabled={request.sap_status !== 'pendente' || actionLoading === request.sap_id} onClick={() => handleRejectProfile(request)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
+                        <button disabled={request.sap_status !== 'pendente' || actionLoading === request.sap_id} onClick={() => openRejectDialog('profile', request)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Recusar</button>
                       </div>
                     </td>
                   </tr>
@@ -413,6 +456,32 @@ export default function AdminPanel({ initialTab = 'all' }) {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={Boolean(rejectDialog)}
+        onClose={() => setRejectDialog(null)}
+        title="Motivo da recusa"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Escreva o motivo. Ele será salvo na auditoria e, em alterações de perfil, também aparecerá na atividade recente do usuário.
+          </p>
+          <textarea
+            className="input-field min-h-28 resize-y"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="Ex.: documento incompatível, dados insuficientes, solicitação duplicada..."
+            autoFocus
+          />
+          <div className="flex justify-end gap-3 border-t border-border-soft pt-3">
+            <button className="btn-ghost" onClick={() => setRejectDialog(null)} disabled={Boolean(actionLoading)}>Cancelar</button>
+            <button className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" onClick={handleConfirmReject} disabled={Boolean(actionLoading)}>
+              {actionLoading ? 'Recusando...' : 'Confirmar recusa'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
