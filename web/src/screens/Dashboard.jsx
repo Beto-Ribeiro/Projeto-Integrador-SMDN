@@ -118,7 +118,9 @@ export default function Dashboard() {
     { label: 'Críticos', value: dashboard.stats.criticalSeverity },
   ]
 
-  async function loadDashboard() {
+  async function loadDashboard({ silent = false } = {}) {
+    if (!silent) setLoading(true)
+
     try {
       setError('')
       const data = await getDashboardData()
@@ -132,7 +134,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard()
-    return subscribeDashboardChanges(loadDashboard)
+    return subscribeDashboardChanges(() => loadDashboard({ silent: true }))
   }, [])
   useEffect(() => {
     setMapMode(normalizeMapMode(settings.defaultMapMode))
@@ -270,7 +272,7 @@ export default function Dashboard() {
 
       <div
         className="absolute top-8 right-8 z-10 flex flex-col items-end gap-3"
-        style={{ width: 'clamp(20rem, 28vw, 28rem)' }}
+        style={{ width: 'clamp(19rem, 25vw, 24rem)' }}
       >
         {recentMinimized ? (
           <div className="flex items-center gap-2 self-end">
@@ -305,7 +307,7 @@ export default function Dashboard() {
             role="region"
             aria-label="Ocorrências recentes"
           >
-            <div className="px-4 pt-4 pb-3 border-b border-slate-100">
+            <div className="px-3 pt-4 pb-3 border-b border-slate-100">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold leading-tight text-slate-800">Ocorrências Recentes</h3>
@@ -325,6 +327,15 @@ export default function Dashboard() {
                   {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
                   <button
                     type="button"
+                    onClick={() => loadDashboard()}
+                    className="hidden sm:inline-flex h-8 items-center justify-center rounded-lg border border-border-soft bg-bg-surface px-2.5 text-[11px] font-bold text-slate-600 hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+                    aria-label="Atualizar ocorrências recentes"
+                    title="Atualizar ocorrências"
+                  >
+                    Atualizar
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setRecentMinimized(true)}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-soft bg-bg-surface text-sm font-black text-slate-600 hover:bg-action-hover/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
                     aria-label="Minimizar ocorrências recentes"
@@ -337,7 +348,7 @@ export default function Dashboard() {
             </div>
 
             {error && (
-              <div className="mx-4 mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <div className="mx-3 mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
                 {error}
               </div>
             )}
@@ -356,7 +367,7 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => handleOccClick(occ)}
                       aria-label={`Abrir detalhes de ${occ.title}, severidade ${cfg.label}, ${occ.city}`}
-                      className="w-full flex items-start gap-2.5 px-4 py-3 hover:bg-slate-50/80 transition-colors text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-500"
+                      className="w-full flex items-start gap-2.5 px-3 py-3 hover:bg-slate-50/80 transition-colors text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-500"
                     >
                       <span
                         className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1"
@@ -405,8 +416,8 @@ export default function Dashboard() {
         <div
           className="absolute bottom-6 left-16 right-16 z-10 grid pointer-events-none"
           style={{
-            gridTemplateColumns: 'repeat(auto-fit, minmax(clamp(11rem, 18vw, 15rem), 1fr))',
-            gap: 'clamp(0.9rem, 1.6vw, 1.75rem)',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+            gap: 'clamp(0.7rem, 1.1vw, 1.25rem)',
           }}
           role="list"
           aria-label="Indicadores do dashboard"
@@ -425,14 +436,14 @@ export default function Dashboard() {
               key={card.label}
               role="listitem"
               aria-label={`${card.label}: ${card.value}`}
-              className="pointer-events-auto flex min-h-[70px] items-center gap-3 px-4 py-3 bg-bg-surface/95 backdrop-blur-sm shadow-lg border border-border-soft w-full max-w-full"
+              className="pointer-events-auto flex min-h-[64px] items-center gap-3 px-3 py-2.5 bg-bg-surface/95 backdrop-blur-sm shadow-lg border border-border-soft w-full max-w-full"
             >
-              <div className="w-9 h-9 rounded-xl bg-action-hover/15 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-action-hover/15 flex items-center justify-center flex-shrink-0">
                 <img src={card.icon} alt={card.label} className="w-[80%] h-[80%] object-contain" />
               </div>
               <div className="min-w-0">
                 <p className="text-[clamp(8px,0.72vw,10px)] font-bold text-slate-700 tracking-wider truncate">{card.label}</p>
-                <p className={`text-[clamp(18px,1.9vw,24px)] font-black mt-0.5 leading-none ${card.color}`}>{card.value}</p>
+                <p className={`text-[clamp(17px,1.7vw,23px)] font-black mt-0.5 leading-none ${card.color}`}>{card.value}</p>
               </div>
             </Card>
           ))}

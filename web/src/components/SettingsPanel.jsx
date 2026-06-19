@@ -142,6 +142,7 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
               value={settings.fontScale}
               onChange={(value) => updateSetting('fontScale', value)}
               options={[
+                { value: 'small', label: 'Pequena', description: 'Mais conteúdo sem dar zoom no navegador.' },
                 { value: 'normal', label: 'Normal' },
                 { value: 'large', label: 'Grande' },
                 { value: 'xlarge', label: 'Muito grande' },

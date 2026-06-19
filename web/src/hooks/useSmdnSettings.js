@@ -19,6 +19,10 @@ function normalizeSettings(settings) {
     ...(settings || {}),
   }
 
+  if (!['small', 'normal', 'large', 'xlarge'].includes(next.fontScale)) {
+    next.fontScale = DEFAULT_SETTINGS.fontScale
+  }
+
   if (next.defaultMapMode === 'heat') {
     next.defaultMapMode = 'points'
   }

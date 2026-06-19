@@ -13,7 +13,6 @@ import auditoriaIconWHITE from '../assets/menu/hover/lock.svg'
 import perfilIcon from '../assets/menu/ativo/user.svg'
 import perfilIconWHITE from '../assets/menu/hover/user.svg'
 import logoutIcon from '../assets/menu/ativo/log-out.svg'
-import logoutIconWHITE from '../assets/menu/hover/log-out.svg'
 import logoClaro from '../assets/logo-claro.svg'
 import logoEscuro from '../assets/logo.svg'
 import SettingsPanel from './SettingsPanel.jsx'
@@ -197,7 +196,6 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
 
         <div className="px-3 py-4 border-t border-white/5 space-y-2">
           <AssistantWidget currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} />
-          <SettingsPanel />
 
           {displayUser && (
             <div className="relative">
@@ -222,18 +220,37 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               {showProfilePopup && (
                 <div
                   ref={popupRef}
-                  className="fixed bottom-14 left-[210px] w-72 bg-white rounded-2xl shadow-2xl p-5 z-[99999] border border-slate-200"
+                  className="fixed bottom-14 left-[210px] w-72 bg-bg-surface rounded-2xl shadow-2xl p-5 pt-6 z-[99999] border border-border-soft"
                 >
+                  <div className="absolute left-4 top-4">
+                    <SettingsPanel variant="icon" panelClassName="bottom-20" />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfilePopup(false)
+                      setShowLogoutConfirm(true)
+                    }}
+                    className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"
+                    title="Sair"
+                    aria-label="Sair da conta"
+                  >
+                    <img src={logoutIcon} width="18" height="18" alt="" />
+                  </button>
+
                   <div className="flex flex-col items-center">
                     <UserAvatar user={displayUser} size="lg" />
 
-                    <h3 className="mt-3 font-bold text-slate-800">
-                      {displayUser.name}
-                    </h3>
+                    <div className="mt-3 w-full px-10 text-center">
+                      <h3 className="font-bold text-slate-800 truncate">
+                        {displayUser.name}
+                      </h3>
 
-                    <p className="text-sm text-slate-500">
-                      {displayUser.roleLabel || displayUser.role}
-                    </p>
+                      <p className="text-sm text-slate-500 truncate">
+                        {displayUser.roleLabel || displayUser.role}
+                      </p>
+                    </div>
 
                     <div className="w-full border-t mt-3 pt-3 text-sm text-slate-600 space-y-2">
                       <p>{displayUser.institution || displayUser.instituicao?.ins_numero || 'SMDN'}</p>
@@ -246,7 +263,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
                         setCurrentScreen('perfil')
                         setShowProfilePopup(false)
                       }}
-                      className="w-full mt-4 bg-[#597891] hover:bg-[#4A6A83] text-white py-2 rounded-lg font-semibold transition"
+                      className="btn-primary w-full mt-4"
                     >
                       Editar Perfil
                     </button>
@@ -255,17 +272,6 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               )}
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={() => setShowLogoutConfirm(true)}
-            onMouseEnter={() => setHoveredItem('logout')}
-            onMouseLeave={() => setHoveredItem(null)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all"
-          >
-            <img src={hoveredItem === 'logout' ? logoutIconWHITE : logoutIcon} width="20" height="20" alt="log-out" />
-            <span>Sair</span>
-          </button>
         </div>
       </aside>
 
@@ -273,7 +279,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
         <div className="fixed inset-0 z-[100000] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowLogoutConfirm(false)} />
 
-          <div className="relative bg-white rounded-2xl shadow-modal px-8 py-7 flex flex-col items-center gap-4 max-w-xs w-full mx-4 animate-slide-up">
+          <div className="relative bg-bg-surface rounded-2xl shadow-modal px-8 py-7 flex flex-col items-center gap-4 max-w-xs w-full mx-4 animate-slide-up border border-border-soft">
             <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
               <img
                 src={logoutIcon}

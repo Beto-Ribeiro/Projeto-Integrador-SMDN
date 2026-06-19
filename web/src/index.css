@@ -24,7 +24,7 @@
 
 html[data-theme='light'] {
   --bg-main: 241 245 249;
-  --bg-sidebar: 255 255 255;
+  --bg-sidebar: 237 245 252;
   --bg-surface: 255 255 255;
   --text-main: 49 99 143;
   --text-on-dark: 55 65 81;
@@ -202,6 +202,11 @@ html[data-colorblind='true'] .badge-success::before {
 }
 
 /* Sidebar scrollbar hide */
+.sidebar-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
 .sidebar-scroll::-webkit-scrollbar {
   display: none;
 }
@@ -287,4 +292,89 @@ html[data-theme='dark'] .shadow-card,
 html[data-theme='dark'] .shadow-xl,
 html[data-theme='dark'] .shadow-lg {
   box-shadow: 0 18px 45px rgb(0 0 0 / 0.26) !important;
+}
+
+/* Acessibilidade: fonte pequena */
+html[data-font-scale='small'] {
+  font-size: 93.75%;
+}
+
+/* Acessibilidade: alto contraste sem estourar bordas em preto */
+html[data-contrast='high'] {
+  --text-main: 0 95 160;
+  --action-hover: 0 95 160;
+  --border-soft: 116 136 157;
+}
+
+html[data-contrast='high'][data-theme='dark'] {
+  --text-main: 147 197 253;
+  --action-hover: 96 165 250;
+  --border-soft: 148 163 184;
+}
+
+html[data-contrast='high'] .btn-primary,
+html[data-contrast='high'] .bg-text-main {
+  background-color: rgb(var(--text-main)) !important;
+  color: #fff !important;
+}
+
+html[data-contrast='high'] .btn-ghost,
+html[data-contrast='high'] .input-field,
+html[data-contrast='high'] .select-field,
+html[data-contrast='high'] button.border-border-soft,
+html[data-contrast='high'] .border-border-soft {
+  border-color: rgb(var(--border-soft)) !important;
+}
+
+html[data-contrast='high'] .text-slate-400,
+html[data-contrast='high'] .text-slate-500 {
+  color: rgb(71 85 105) !important;
+}
+
+html[data-contrast='high'][data-theme='dark'] .text-slate-400,
+html[data-contrast='high'][data-theme='dark'] .text-slate-500 {
+  color: rgb(203 213 225) !important;
+}
+
+html[data-contrast='high'] .bg-text-main\/10,
+html[data-contrast='high'] .hover\:bg-text-main\/20:hover,
+html[data-contrast='high'] .hover\:bg-action-hover\/20:hover {
+  background-color: rgb(var(--text-main) / 0.18) !important;
+}
+
+/* Acessibilidade: modo daltônico também muda cor de ação/botões */
+html[data-colorblind='true'] {
+  --text-main: 0 92 171;
+  --action-hover: 0 92 171;
+  --sidebar-active: 0 92 171;
+}
+
+html[data-colorblind='true'][data-theme='dark'] {
+  --text-main: 96 165 250;
+  --action-hover: 59 130 246;
+}
+
+html[data-colorblind='true'] .btn-primary,
+html[data-colorblind='true'] .bg-text-main {
+  background-color: rgb(var(--text-main)) !important;
+  color: #fff !important;
+}
+
+html[data-colorblind='true'] .text-text-main,
+html[data-colorblind='true'] .btn-ghost {
+  color: rgb(var(--text-main)) !important;
+}
+
+html[data-colorblind='true'] .bg-text-main\/10 {
+  background-color: rgb(var(--text-main) / 0.16) !important;
+}
+
+html[data-colorblind='true'] .hover\:bg-text-main\/20:hover,
+html[data-colorblind='true'] .hover\:bg-action-hover\/20:hover {
+  background-color: rgb(var(--text-main) / 0.24) !important;
+}
+
+html[data-colorblind='true'] .ring-text-main,
+html[data-colorblind='true'] .focus-visible\:outline-text-main:focus-visible {
+  outline-color: rgb(var(--text-main)) !important;
 }
