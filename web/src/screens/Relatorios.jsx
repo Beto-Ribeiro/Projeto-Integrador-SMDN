@@ -22,7 +22,6 @@ import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 // Se ainda não instalou: npm install html2canvas jspdf xlsx
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
-import * as XLSX from 'xlsx'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOOK DE DADOS REAIS
@@ -188,105 +187,213 @@ async function exportToPDF(element, period) {
  * Gera e baixa um arquivo Excel (.xlsx) com abas separadas por seção.
  * Estruturado para receber dados reais sem alteração.
  */
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
+function periodSlug(period) {
+  const normalized = String(period || '').toLowerCase()
+  if (normalized.includes('7')) return '7dias'
+  if (normalized.includes('30')) return '30dias'
+  if (normalized.includes('ano')) return '1ano'
+  return '6meses'
+}
+
+function reportFileName(period, extension = 'xls') {
+  const now = new Date()
+  const pad = (value) => String(value).padStart(2, '0')
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  const time = `${pad(now.getHours())}h${pad(now.getMinutes())}`
+  return `${date}_${periodSlug(period)}_${time}.${extension}`
+}
+
+function tableHtml(headers, rows, options = {}) {
+  const caption = options.caption ? `<tr><td class="section-title" colspan="${headers.length}">${escapeHtml(options.caption)}</td></tr>` : ''
+  return `
+    <table class="report-table">
+      ${caption}
+      <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${rows.map((row) => `<tr>${row.map((cell, index) => `<td class="${options.cellClass?.(cell, index, row) || ''}">${cell}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table>
+  `
+}
+
+function kpiCardHtml(label, value, detail, tone = 'blue') {
+  return `
+    <td class="kpi kpi-${tone}">
+      <div class="kpi-label">${escapeHtml(label)}</div>
+      <div class="kpi-value">${escapeHtml(value)}</div>
+      <div class="kpi-detail">${escapeHtml(detail)}</div>
+    </td>
+  `
+}
+
+function downloadHtmlExcel(html, filename) {
+  const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Gera e baixa um Excel em HTML formatado.
+ * O Excel abre como .xls com cores, títulos grandes, tabelas e layout horizontal.
+ */
 function exportToExcel(data, period) {
-  const wb = XLSX.utils.book_new()
+  const generatedAt = new Date().toLocaleString('pt-BR')
 
-  // ── Aba 1: Resumo ──────────────────────────────────────────────────────────
-  const resumoRows = [
-    ['SMDN – Relatório de Ocorrências'],
-    [`Período: ${period}`],
-    [`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`],
-    [],
-    ['Indicador', 'Valor', 'Variação'],
-    ['Total de Ocorrências', data.kpis.total,         data.kpis.totalDelta],
-    ['Taxa de Resolução',    data.kpis.resolutionRate, data.kpis.resolutionDelta],
-  ]
-  const wsResumo = XLSX.utils.aoa_to_sheet(resumoRows)
-  wsResumo['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 14 }]
-  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo')
+  const severityRows = data.bySeverity.map((item) => [
+    escapeHtml(SEVERITY_META[item.label]?.symbol || '•'),
+    escapeHtml(item.label),
+    escapeHtml(item.count),
+    escapeHtml(`${item.pct}%`),
+  ])
 
-  // ── Aba 2: Por Mês ─────────────────────────────────────────────────────────
-  const monthlyRows = [
-    ['Mês', 'Total', 'Críticos', '% Críticos'],
-    ...data.monthly.map((m) => [
-      m.month,
-      m.total,
-      m.critical,
-      m.total > 0 ? `${((m.critical / m.total) * 100).toFixed(1)}%` : '0%',
-    ]),
-  ]
-  const wsMensal = XLSX.utils.aoa_to_sheet(monthlyRows)
-  wsMensal['!cols'] = [{ wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }]
-  XLSX.utils.book_append_sheet(wb, wsMensal, 'Por Mês')
+  const statusRows = data.byStatus.map((item) => [
+    escapeHtml(STATUS_META[item.label]?.label || item.label),
+    escapeHtml(item.label),
+    escapeHtml(item.count),
+    escapeHtml(`${item.pct}%`),
+  ])
 
-  // ── Aba 3: Por Tipo ────────────────────────────────────────────────────────
-  const typeRows = [
-    ['Tipo', 'Qtd. Ocorrências', '% do Total'],
-    ...data.byType.map((t) => [t.type, t.count, `${t.pct}%`]),
-  ]
-  const wsType = XLSX.utils.aoa_to_sheet(typeRows)
-  wsType['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 14 }]
-  XLSX.utils.book_append_sheet(wb, wsType, 'Por Tipo')
+  const monthlyRows = data.monthly.map((item) => [
+    escapeHtml(item.month),
+    escapeHtml(item.total),
+    escapeHtml(item.critical),
+    escapeHtml(item.total > 0 ? `${((item.critical / item.total) * 100).toFixed(1)}%` : '0%'),
+    escapeHtml(item.critical > 0 ? 'Atenção a ocorrências críticas' : 'Sem críticas no período'),
+  ])
 
-  // ── Aba 4: Por Município ───────────────────────────────────────────────────
-  const cityRows = [
-    ['Município', 'Qtd. Ocorrências'],
-    ...data.byCity.map((c) => [c.city, c.count]),
-  ]
-  const wsCity = XLSX.utils.aoa_to_sheet(cityRows)
-  wsCity['!cols'] = [{ wch: 28 }, { wch: 18 }]
-  XLSX.utils.book_append_sheet(wb, wsCity, 'Por Município')
+  const cityRows = data.byCity.map((item, index) => [
+    escapeHtml(index + 1),
+    escapeHtml(item.city),
+    escapeHtml(item.count),
+    escapeHtml(index < 3 ? 'Alta prioridade' : 'Monitorar'),
+  ])
 
-  // ── Aba 5: Severidade ──────────────────────────────────────────────────────
-  const severityRows = [
-    ['Nível', 'Qtd. Ocorrências', '% do Total'],
-    ...data.bySeverity.map((s) => [s.label, s.count, `${s.pct}%`]),
-  ]
-  const wsSeverity = XLSX.utils.aoa_to_sheet(severityRows)
-  wsSeverity['!cols'] = [{ wch: 14 }, { wch: 18 }, { wch: 14 }]
-  XLSX.utils.book_append_sheet(wb, wsSeverity, 'Severidade')
+  const typeRows = data.byType.map((item) => [
+    escapeHtml(item.type),
+    escapeHtml(item.count),
+    escapeHtml(`${item.pct}%`),
+    escapeHtml(item.pct >= 25 ? 'Tipo recorrente' : 'Acompanhar tendência'),
+  ])
 
-  // ── Aba 6: Status ──────────────────────────────────────────────────────────
-  const statusRows = [
-    ['Status', 'Qtd. Ocorrências', '% do Total'],
-    ...data.byStatus.map((s) => [s.label, s.count, `${s.pct}%`]),
-  ]
-  const wsStatus = XLSX.utils.aoa_to_sheet(statusRows)
-  wsStatus['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 14 }]
-  XLSX.utils.book_append_sheet(wb, wsStatus, 'Status')
+  const occurrenceRows = (data.occurrences || []).map((item) => [
+    escapeHtml(item.id),
+    escapeHtml(item.tipo),
+    escapeHtml(item.descricao),
+    escapeHtml(item.severidade),
+    escapeHtml(item.status),
+    escapeHtml(item.municipio),
+    escapeHtml(item.cidadaoNome),
+    escapeHtml(item.data ? new Date(item.data).toLocaleString('pt-BR') : 'Data não informada'),
+    escapeHtml(item.lat ?? '—'),
+    escapeHtml(item.lng ?? '—'),
+  ])
 
-  // ── Aba 7: Ocorrências detalhadas ───────────────────────────────────────────
-  const occurrenceRows = [
-    ['ID', 'Tipo', 'Descrição/Risco', 'Severidade', 'Status', 'Município', 'Cidadão', 'Data', 'Latitude', 'Longitude'],
-    ...(data.occurrences || []).map((item) => [
-      item.id,
-      item.tipo,
-      item.descricao,
-      item.severidade,
-      item.status,
-      item.municipio,
-      item.cidadaoNome,
-      item.data ? new Date(item.data).toLocaleString('pt-BR') : 'Data não informada',
-      item.lat,
-      item.lng,
-    ]),
-  ]
-  const wsOccurrences = XLSX.utils.aoa_to_sheet(occurrenceRows)
-  wsOccurrences['!cols'] = [
-    { wch: 38 },
-    { wch: 18 },
-    { wch: 20 },
-    { wch: 14 },
-    { wch: 14 },
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 20 },
-    { wch: 12 },
-    { wch: 12 },
-  ]
-  XLSX.utils.book_append_sheet(wb, wsOccurrences, 'Ocorrências')
+  const html = `
+    <!doctype html>
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8" />
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>SMDN Relatório</x:Name>
+                <x:WorksheetOptions>
+                  <x:PageSetup><x:Layout x:Orientation="Landscape"/></x:PageSetup>
+                  <x:FitToPage/>
+                  <x:Print><x:FitWidth>1</x:FitWidth><x:FitHeight>0</x:FitHeight></x:Print>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #eef5fa; color: #0f172a; }
+          .sheet { width: 1280px; padding: 22px; background: #eef5fa; }
+          .hero { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+          .hero-title { background: #0b1f35; color: #ffffff; font-size: 28px; font-weight: 800; padding: 18px 22px; border: 1px solid #0b1f35; }
+          .hero-meta { background: #dfeaf3; color: #1e3a55; font-size: 13px; font-weight: 700; padding: 10px 22px; border: 1px solid #b8c8d8; }
+          .kpi-grid { width: 100%; border-collapse: separate; border-spacing: 12px; margin-bottom: 20px; }
+          .kpi { border-radius: 16px; border: 1px solid #9fb5c9; padding: 16px 18px; width: 25%; vertical-align: top; }
+          .kpi-blue { background: #dbeafe; }
+          .kpi-green { background: #dcfce7; }
+          .kpi-red { background: #fee2e2; }
+          .kpi-orange { background: #ffedd5; }
+          .kpi-label { color: #334155; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+          .kpi-value { color: #0f172a; font-size: 30px; font-weight: 900; margin-top: 5px; }
+          .kpi-detail { color: #475569; font-size: 13px; font-weight: 700; margin-top: 4px; }
+          .two-col { width: 100%; border-collapse: separate; border-spacing: 14px; margin-bottom: 18px; }
+          .two-col > tbody > tr > td { width: 50%; vertical-align: top; }
+          .report-table { width: 100%; border-collapse: collapse; background: #ffffff; margin-bottom: 18px; border: 1px solid #9fb5c9; }
+          .report-table th { background: #123a5c; color: #ffffff; font-size: 13px; font-weight: 800; padding: 10px; border: 1px solid #0b1f35; text-align: left; }
+          .report-table td { font-size: 12px; padding: 9px 10px; border: 1px solid #c7d6e3; color: #1e293b; }
+          .report-table tr:nth-child(even) td { background: #f6f9fc; }
+          .section-title { background: #82b9df !important; color: #0b1f35 !important; font-size: 17px !important; font-weight: 900 !important; padding: 12px !important; border: 1px solid #5a93bd !important; }
+          .critical { color: #b91c1c; font-weight: 900; }
+          .severe { color: #c2410c; font-weight: 900; }
+          .regular { color: #a16207; font-weight: 900; }
+          .success { color: #047857; font-weight: 900; }
+          .muted { color: #64748b; }
+          .wide { width: 100%; }
+        </style>
+      </head>
+      <body>
+        <div class="sheet">
+          <table class="hero">
+            <tr><td class="hero-title" colspan="4">SMDN — Relatório de Ocorrências</td></tr>
+            <tr>
+              <td class="hero-meta">Período: ${escapeHtml(period)}</td>
+              <td class="hero-meta">Gerado em: ${escapeHtml(generatedAt)}</td>
+              <td class="hero-meta">Fonte: Painel SMDN</td>
+              <td class="hero-meta">Formato: Executivo</td>
+            </tr>
+          </table>
 
-  XLSX.writeFile(wb, `SMDN_Relatorio_${period.replace(/\s+/g, '_')}.xlsx`)
+          <table class="kpi-grid">
+            <tr>
+              ${kpiCardHtml('Total de Ocorrências', data.kpis.total, data.kpis.totalDelta, 'blue')}
+              ${kpiCardHtml('Taxa de Resolução', data.kpis.resolutionRate, data.kpis.resolutionDelta, 'green')}
+              ${kpiCardHtml('Ocorrências Críticas', data.bySeverity.find((item) => item.label === 'Crítico')?.count || 0, 'prioridade máxima', 'red')}
+              ${kpiCardHtml('Municípios Monitorados', data.byCity.length, 'com ocorrências no período', 'orange')}
+            </tr>
+          </table>
+
+          <table class="two-col"><tr>
+            <td>${tableHtml(['Símbolo', 'Nível', 'Qtd.', '%'], severityRows, { caption: 'Distribuição de Severidade' })}</td>
+            <td>${tableHtml(['Ícone', 'Status', 'Qtd.', '%'], statusRows, { caption: 'Status das Ocorrências' })}</td>
+          </tr></table>
+
+          ${tableHtml(['Mês', 'Total', 'Críticas', '% Críticas', 'Leitura rápida'], monthlyRows, { caption: 'Ocorrências por Mês' })}
+
+          <table class="two-col"><tr>
+            <td>${tableHtml(['Ranking', 'Município', 'Qtd.', 'Prioridade'], cityRows, { caption: 'Ocorrências por Município' })}</td>
+            <td>${tableHtml(['Tipo', 'Qtd.', '%', 'Observação'], typeRows, { caption: 'Ocorrências por Tipo' })}</td>
+          </tr></table>
+
+          ${tableHtml(['ID', 'Tipo', 'Descrição/Risco', 'Severidade', 'Status', 'Município', 'Cidadão', 'Data', 'Latitude', 'Longitude'], occurrenceRows, { caption: 'Ocorrências Detalhadas' })}
+        </div>
+      </body>
+    </html>
+  `
+
+  downloadHtmlExcel(html, reportFileName(period, 'xls'))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

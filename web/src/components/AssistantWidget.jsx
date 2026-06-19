@@ -99,8 +99,14 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
   )
 
   useEffect(() => {
-    if (open) setMessages(buildInitialMessages(context))
-  }, [context, open])
+    if (open && messages.length === 0) {
+      setMessages(buildInitialMessages(context))
+    }
+  }, [context, messages.length, open])
+
+  function restartChat() {
+    setMessages(buildInitialMessages(context))
+  }
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -148,7 +154,14 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
           role="dialog"
           aria-label="Assistente IA SMDN"
         >
-          <div className="flex items-center justify-end border-b border-border-soft px-4 py-3 bg-text-main/5">
+          <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3 bg-text-main/5">
+            <button
+              type="button"
+              onClick={restartChat}
+              className="rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
+            >
+              Reiniciar chat
+            </button>
             <button
               type="button"
               onClick={() => setOpen(false)}

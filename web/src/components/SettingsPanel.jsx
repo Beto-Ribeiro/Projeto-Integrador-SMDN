@@ -110,11 +110,7 @@ export default function SettingsPanel({ variant = 'row', className = '', panelCl
           role="dialog"
           aria-label="Configurações do SMDN"
         >
-          <div className="flex items-start justify-between gap-4 border-b border-border-soft pb-4 mb-4">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">Configurações</h2>
-              <p className="text-xs text-slate-500 mt-1">Tema, acessibilidade e preferências do painel.</p>
-            </div>
+          <div className="flex items-center justify-end border-b border-border-soft pb-3 mb-4">
             <button
               type="button"
               onClick={() => setOpen(false)}
