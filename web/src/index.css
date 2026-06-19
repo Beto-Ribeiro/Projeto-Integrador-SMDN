@@ -92,8 +92,14 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+html,
+body,
+#root {
+  min-width: 0;
+}
+
 body {
-  min-width: 1024px;
+  overflow-x: hidden;
 }
 
 :focus-visible {

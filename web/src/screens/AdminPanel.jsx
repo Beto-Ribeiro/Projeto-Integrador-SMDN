@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal.jsx'
+import { supabase } from '../backend/supabase/client.js'
 import {
   approveAccessRequest,
   approveProfileChangeRequest,
@@ -44,7 +45,7 @@ function StatusPill({ status }) {
   )
 }
 
-function ChangeList({ changes, currentProfile }) {
+function ChangeList({ changes, currentProfile, status }) {
   const entries = Object.entries(changes || {})
   if (entries.length === 0) return <span className="text-slate-400">—</span>
 
@@ -54,29 +55,31 @@ function ChangeList({ changes, currentProfile }) {
         if (key === 'avatar') {
           const currentAvatar = currentProfile?.prf_avatar_url
           const nextAvatar = change.value || change.newValue || change.new
+          const approved = status === 'aprovado'
+          const rejected = status === 'recusado'
 
           return (
-            <div key={key} className="admin-avatar-change-card rounded-xl border border-border-soft bg-slate-50/70 p-2 text-xs text-slate-600">
-              <p className="mb-2 font-bold text-slate-700">{change.label || 'Foto do perfil'}</p>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
+            <div key={key} className="text-xs text-slate-600 leading-relaxed">
+              <span className="font-bold text-slate-700">{change.label || 'Foto do perfil'}:</span>{' '}
+              {approved ? (
+                <span className="inline-flex items-center gap-2 align-middle">
+                  <span className="font-semibold text-slate-700">alterada para</span>
+                  {nextAvatar ? <img src={nextAvatar} alt="Nova foto aprovada" className="h-8 w-8 rounded-full border border-border-soft object-cover" /> : <span className="text-slate-400">nova foto</span>}
+                </span>
+              ) : rejected ? (
+                <span className="inline-flex items-center gap-2 align-middle">
+                  {currentAvatar ? <img src={currentAvatar} alt="Foto atual mantida" className="h-8 w-8 rounded-full border border-border-soft object-cover" /> : <span className="text-slate-400">foto atual</span>}
+                  <span className="font-semibold text-red-300">solicitação recusada</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2 align-middle">
                   <span className="text-slate-400">Atual</span>
-                  {currentAvatar ? (
-                    <img src={currentAvatar} alt="Foto atual" className="h-10 w-10 rounded-full border border-border-soft object-cover" />
-                  ) : (
-                    <span className="rounded-full border border-border-soft px-2 py-1 text-[10px] text-slate-400">sem foto</span>
-                  )}
-                </div>
-                <span className="text-slate-400">→</span>
-                <div className="flex items-center gap-2">
+                  {currentAvatar ? <img src={currentAvatar} alt="Foto atual" className="h-8 w-8 rounded-full border border-border-soft object-cover" /> : <span className="text-slate-400">sem foto</span>}
+                  <span className="text-slate-400">→</span>
                   <span className="text-slate-400">Solicitada</span>
-                  {nextAvatar ? (
-                    <img src={nextAvatar} alt="Nova foto solicitada" className="h-10 w-10 rounded-full border border-border-soft object-cover" />
-                  ) : (
-                    <span className="rounded-full border border-border-soft px-2 py-1 text-[10px] text-slate-400">sem foto</span>
-                  )}
-                </div>
-              </div>
+                  {nextAvatar ? <img src={nextAvatar} alt="Nova foto solicitada" className="h-8 w-8 rounded-full border border-border-soft object-cover" /> : <span className="text-slate-400">sem foto</span>}
+                </span>
+              )}
             </div>
           )
         }
@@ -113,10 +116,14 @@ export default function AdminPanel({ initialTab = 'all' }) {
   const [rejectDialog, setRejectDialog] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
 
-  async function loadAdminData() {
-    setLoading(true)
+  async function loadAdminData(options = {}) {
+    const preserveScroll = Boolean(options.preserveScroll)
+    const scrollEl = document.querySelector('main')
+    const previousScrollTop = preserveScroll ? scrollEl?.scrollTop : null
+
+    if (!preserveScroll) setLoading(true)
     setError('')
-    setMessage('')
+    if (!preserveScroll) setMessage('')
 
     try {
       const [requestsResult, profileRequestsResult, profilesResult, logsResult] = await Promise.all([
@@ -134,12 +141,29 @@ export default function AdminPanel({ initialTab = 'all' }) {
     } catch (err) {
       setError(err.message || 'Não foi possível carregar o painel administrativo.')
     } finally {
-      setLoading(false)
+      if (!preserveScroll) setLoading(false)
+      if (preserveScroll && scrollEl && typeof previousScrollTop === 'number') {
+        requestAnimationFrame(() => {
+          scrollEl.scrollTop = previousScrollTop
+        })
+      }
     }
   }
 
   useEffect(() => {
     loadAdminData()
+  }, [])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-panel-live-preserve-scroll')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'Solicitacao_Acesso_Web' }, () => loadAdminData({ preserveScroll: true }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'Solicitacao_Alteracao_Perfil' }, () => loadAdminData({ preserveScroll: true }))
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
@@ -270,13 +294,13 @@ export default function AdminPanel({ initialTab = 'all' }) {
       )}
 
       {error && (
-        <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700 leading-relaxed">
+        <div role="alert" className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700 leading-relaxed">
           {error}
         </div>
       )}
 
       {message && (
-        <div className="rounded-2xl border border-green-100 bg-green-50 px-5 py-4 text-sm text-green-700 leading-relaxed">
+        <div role="status" aria-live="polite" className="rounded-2xl border border-green-100 bg-green-50 px-5 py-4 text-sm text-green-700 leading-relaxed">
           {message}
         </div>
       )}
@@ -351,7 +375,7 @@ export default function AdminPanel({ initialTab = 'all' }) {
                   <tr key={item.id} className="hover:bg-slate-50/60 align-top">
                     <td className="px-5 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{item.type}</span></td>
                     <td className="px-5 py-4"><p className="font-semibold text-slate-700">{item.requesterName || '—'}</p><p className="text-xs text-slate-400">{item.requesterEmail || '—'}</p></td>
-                    <td className="px-5 py-4 text-slate-600">{item.source === 'profile' ? <ChangeList changes={item.changes} currentProfile={item.currentProfile} /> : item.details}</td>
+                    <td className="px-5 py-4 text-slate-600">{item.source === 'profile' ? <ChangeList changes={item.changes} currentProfile={item.currentProfile} status={item.status} /> : item.details}</td>
                     <td className="px-5 py-4"><StatusPill status={item.status} /></td>
                     <td className="px-5 py-4 text-slate-500">{formatDate(item.createdAt)}</td>
                     <td className="px-5 py-4">
@@ -428,7 +452,7 @@ export default function AdminPanel({ initialTab = 'all' }) {
                 {profileRequests.map((request) => (
                   <tr key={request.sap_id} className="hover:bg-slate-50/60 align-top">
                     <td className="px-5 py-4"><p className="font-semibold text-slate-700">{request.sap_nome_solicitante || '—'}</p><p className="text-xs text-slate-400">{request.sap_email_solicitante || request.sap_user_id}</p></td>
-                    <td className="px-5 py-4"><ChangeList changes={request.sap_alteracoes} currentProfile={profileMap.get(request.sap_user_id)} /></td>
+                    <td className="px-5 py-4"><ChangeList changes={request.sap_alteracoes} currentProfile={profileMap.get(request.sap_user_id)} status={request.sap_status} /></td>
                     <td className="px-5 py-4"><StatusPill status={request.sap_status} /></td>
                     <td className="px-5 py-4 text-slate-500">{formatDate(request.sap_created_at)}</td>
                     <td className="px-5 py-4">

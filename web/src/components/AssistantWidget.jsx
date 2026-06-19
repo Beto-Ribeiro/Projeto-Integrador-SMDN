@@ -86,7 +86,7 @@ function buildInitialMessages(context) {
   ]
 }
 
-export default function AssistantWidget({ currentScreen, setCurrentScreen }) {
+export default function AssistantWidget({ currentScreen, setCurrentScreen, compact = false }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const panelRef = useRef(null)
@@ -132,12 +132,12 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen }) {
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${compact ? 'justify-center' : ''}`}
         aria-expanded={open}
         aria-label="Abrir IA SMDN"
       >
         <SparkIcon />
-        <span>IA SMDN</span>
+        <span className={compact ? 'sr-only' : undefined}>IA SMDN</span>
       </button>
 
       {open && (

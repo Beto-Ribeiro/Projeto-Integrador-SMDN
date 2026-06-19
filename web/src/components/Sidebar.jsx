@@ -15,6 +15,7 @@ import perfilIconWHITE from '../assets/menu/hover/user.svg'
 import logoutIcon from '../assets/menu/ativo/log-out.svg'
 import logoClaro from '../assets/logo-claro.svg'
 import logoEscuro from '../assets/logo.svg'
+import faviconIcon from '../assets/favicon.svg'
 import SettingsPanel from './SettingsPanel.jsx'
 import AssistantWidget from './AssistantWidget.jsx'
 import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
@@ -94,17 +95,18 @@ function UserAvatar({ user, size = 'sm' }) {
   )
 }
 
-function NavButton({ item, currentScreen, setCurrentScreen, badge }) {
+function NavButton({ item, currentScreen, setCurrentScreen, badge, collapsed = false }) {
   const active = currentScreen === item.id
 
   return (
     <button
       key={item.id}
       type="button"
+      title={collapsed ? item.label : undefined}
       onClick={() => setCurrentScreen(item.id)}
       aria-current={active ? 'page' : undefined}
       className={`
-        group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-200 ease-out
+        group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-200 ease-out ${collapsed ? 'justify-center' : ''}
         focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main
         ${active
           ? 'bg-text-main text-white shadow-sm'
@@ -113,9 +115,9 @@ function NavButton({ item, currentScreen, setCurrentScreen, badge }) {
       `}
     >
       <span className="transition-transform duration-200 ease-out group-hover:scale-105">{active ? item.iconWhite : item.icon}</span>
-      <span className="truncate">{item.label}</span>
+      <span className={collapsed ? 'sr-only' : 'truncate'}>{item.label}</span>
       {badge && (
-        <span className="notification-badge ml-auto inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none">
+        <span className={`notification-badge inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${collapsed ? 'absolute -right-1 -top-1' : 'ml-auto'}`}>
           {badge}
         </span>
       )}
@@ -148,6 +150,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
   const [showProfilePopup, setShowProfilePopup] = useState(false)
   const [accountSwitchError, setAccountSwitchError] = useState('')
   const [notifications, setNotifications] = useState({ dashboard: '', admin: 0 })
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('smdn_sidebar_collapsed') === 'true')
 
   const popupRef = useRef(null)
   const buttonRef = useRef(null)
@@ -228,6 +231,10 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
     }
   }, [currentScreen, showAdmin])
 
+  useEffect(() => {
+    localStorage.setItem('smdn_sidebar_collapsed', collapsed ? 'true' : 'false')
+  }, [collapsed])
+
   async function handleSwitchAccount(accountId) {
     setAccountSwitchError('')
 
@@ -248,17 +255,58 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
   return (
     <>
       <aside
-        className="sidebar-scroll relative flex flex-col w-[220px] min-w-[220px] h-screen bg-bg-sidebar shadow-sidebar overflow-y-auto z-[10000]"
+        className={`sidebar-scroll relative flex flex-col h-screen bg-bg-sidebar shadow-sidebar overflow-y-auto z-[10000] transition-[width,min-width] duration-200 ${collapsed ? 'w-[76px] min-w-[76px]' : 'w-[220px] min-w-[220px]'}`}
       >
-        <div className="px-5 pt-6 pb-6 border-b border-white/5">
+        <div className={`relative border-b border-white/5 ${collapsed ? 'px-3 pt-14 pb-8' : 'px-5 pt-6 pb-6'}`}>
           <img
-            src={effectiveTheme === 'light' ? logoEscuro : logoClaro}
+            src={collapsed ? faviconIcon : (effectiveTheme === 'light' ? logoEscuro : logoClaro)}
             alt="SMDN Logo"
-            className="w-full max-w-[160px]"
+            className={collapsed ? 'mx-auto h-11 w-11 max-w-[44px] rounded-xl object-contain' : 'w-full max-w-[160px]'}
           />
+          <button
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
+            className={`absolute ${collapsed ? 'left-1/2 top-3 -translate-x-1/2' : 'right-2 top-2'} inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-text-on-dark/80 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white`}
+            aria-label={collapsed ? 'Expandir menu lateral' : 'Minimizar menu lateral'}
+            title={collapsed ? 'Expandir menu' : 'Minimizar menu'}
+          >
+            {collapsed ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+            )}
+          </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <nav className={`flex-1 py-4 space-y-0.5 ${collapsed ? 'px-2' : 'px-3'}`}>
           {visibleNavItems.map((item) => (
             <NavButton
               key={item.id}
@@ -266,12 +314,13 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               currentScreen={currentScreen}
               setCurrentScreen={setCurrentScreen}
               badge={notifications[item.id]}
+              collapsed={collapsed}
             />
           ))}
 
           {showAdmin && (
             <div className="pt-4 mt-4 border-t border-white/10">
-              <p className="px-3 pb-2 text-[10px] uppercase tracking-[0.18em] text-text-on-dark/50 font-bold">
+              <p className={`px-3 pb-2 text-[10px] uppercase tracking-[0.18em] text-text-on-dark/50 font-bold ${collapsed ? 'sr-only' : ''}`}>
                 Administração
               </p>
 
@@ -283,6 +332,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
                     currentScreen={currentScreen}
                     setCurrentScreen={setCurrentScreen}
                     badge={item.id === 'admin' && notifications.admin ? notifications.admin : ''}
+                    collapsed={collapsed}
                   />
                 ))}
               </div>
@@ -290,8 +340,8 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
           )}
         </nav>
 
-        <div className="px-3 py-4 border-t border-white/5 space-y-2">
-          <AssistantWidget currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} />
+        <div className={`px-3 py-4 border-t border-white/5 space-y-2 ${collapsed ? 'px-2' : 'px-3'}`}>
+          <AssistantWidget currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} compact={collapsed} />
 
           {displayUser && (
             <div className="relative">
@@ -299,11 +349,11 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
                 ref={buttonRef}
                 type="button"
                 onClick={() => { setAccountSwitchError(''); setShowProfilePopup((value) => !value) }}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-all"
+                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 transition-all ${collapsed ? 'justify-center' : ''}`}
               >
                 <UserAvatar user={displayUser} />
 
-                <div className="min-w-0 text-left">
+                <div className={collapsed ? 'sr-only' : 'min-w-0 text-left'}>
                   <p className="text-text-on-dark text-xs font-semibold truncate">
                     {displayUser.name}
                   </p>
@@ -316,7 +366,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
               {showProfilePopup && (
                 <div
                   ref={popupRef}
-                  className="fixed bottom-14 left-[210px] w-72 bg-bg-surface rounded-2xl shadow-2xl p-5 pt-6 z-[99999] border border-border-soft"
+                  className={`fixed bottom-14 w-72 bg-bg-surface rounded-2xl shadow-2xl p-5 pt-6 z-[99999] border border-border-soft ${collapsed ? 'left-[70px]' : 'left-[210px]'}`}
                 >
                   <div className="absolute left-4 top-4">
                     <SettingsPanel variant="icon" panelClassName="bottom-20" />
