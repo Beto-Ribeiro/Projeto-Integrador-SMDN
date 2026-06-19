@@ -198,7 +198,7 @@ export async function getDashboardData() {
   const { data, error } = await supabase.rpc('get_dashboard_data')
 
   if (error) {
-    throw new Error(error.message || 'Não foi possível carregar o dashboard.')
+    throw new Error('Não foi possível carregar o painel. Tente novamente.')
   }
 
   const recentOccurrences = await withSignedPhotos(data?.recentOccurrences || [])
@@ -229,7 +229,7 @@ export async function updateVictimAssistance({ victim, status = 'atendida' }) {
   })
 
   if (error) {
-    throw new Error(error.message || 'Não foi possível atualizar atendimento da vítima.')
+    throw new Error('Não foi possível atualizar o atendimento da vítima. Tente novamente.')
   }
 
   return data

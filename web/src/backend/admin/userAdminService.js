@@ -114,7 +114,7 @@ async function syncAuthEmailByAdmin({ userId, email }) {
   })
 
   if (error) {
-    throw new Error(`Perfil salvo, mas não foi possível atualizar o e-mail de login: ${error.message}`)
+    throw new Error('Perfil salvo, mas não foi possível alterar o e-mail de entrada. Tente novamente ou avise o responsável pelo painel.')
   }
 
   return data

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal.jsx'
 import { supabase } from '../backend/supabase/client.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 import {
   approveAccessRequest,
   approveProfileChangeRequest,
@@ -115,6 +116,9 @@ export default function AdminPanel({ initialTab = 'all' }) {
   const [message, setMessage] = useState('')
   const [rejectDialog, setRejectDialog] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [passwordDialog, setPasswordDialog] = useState(null)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('')
 
   async function loadAdminData(options = {}) {
     const preserveScroll = Boolean(options.preserveScroll)
@@ -139,7 +143,7 @@ export default function AdminPanel({ initialTab = 'all' }) {
       setLogs(logsResult.data)
       setMissingSchema(Boolean(requestsResult.missingSchema || profileRequestsResult.missingSchema || logsResult.missingSchema))
     } catch (err) {
-      setError(err.message || 'Não foi possível carregar o painel administrativo.')
+      setError(toFriendlyMessage(err, 'Não foi possível carregar o painel administrativo. Tente novamente.'))
     } finally {
       if (!preserveScroll) setLoading(false)
       if (preserveScroll && scrollEl && typeof previousScrollTop === 'number') {
@@ -222,7 +226,7 @@ export default function AdminPanel({ initialTab = 'all' }) {
       setMessage('Solicitação de acesso aprovada.')
       await loadAdminData()
     } catch (err) {
-      setError(err.message || 'Não foi possível aprovar a solicitação.')
+      setError(toFriendlyMessage(err, 'Não foi possível aprovar a solicitação. Tente novamente.'))
     } finally {
       setActionLoading('')
     }
@@ -257,39 +261,70 @@ export default function AdminPanel({ initialTab = 'all' }) {
       setRejectReason('')
       await loadAdminData()
     } catch (err) {
-      setError(err.message || 'Não foi possível recusar a solicitação.')
+      setError(toFriendlyMessage(err, 'Não foi possível recusar a solicitação. Tente novamente.'))
     } finally {
       setActionLoading('')
     }
   }
 
-  async function handleApproveProfile(request) {
+  function handleApproveProfile(request) {
+    setError('')
+    setMessage('')
+
+    if (request.sap_alteracoes?.password) {
+      setPasswordDialog(request)
+      setAdminPassword('')
+      setAdminPasswordConfirm('')
+      return
+    }
+
+    return approveProfileWithoutPasswordDialog(request)
+  }
+
+  async function approveProfileWithoutPasswordDialog(request, options = {}) {
     setActionLoading(request.sap_id)
     setError('')
     setMessage('')
 
     try {
-      await approveProfileChangeRequest(request)
-      const hasPasswordRequest = Boolean(request.sap_alteracoes?.password)
-      setMessage(
-        hasPasswordRequest
-          ? 'Alteração de perfil aprovada. E-mail de redefinição de senha enviado ao usuário.'
-          : 'Alteração de perfil aprovada.'
-      )
+      await approveProfileChangeRequest(request, options)
+      setMessage(options.password ? 'Alteração aprovada. Senha atualizada pelo painel.' : 'Alteração de perfil aprovada.')
       await loadAdminData()
     } catch (err) {
-      setError(err.message || 'Não foi possível aprovar a alteração de perfil.')
+      setError(toFriendlyMessage(err, 'Não foi possível aprovar a alteração de perfil. Tente novamente.'))
     } finally {
       setActionLoading('')
     }
+  }
+
+  async function handleConfirmPasswordApproval() {
+    if (!passwordDialog) return
+
+    const password = adminPassword.trim()
+    const confirmation = adminPasswordConfirm.trim()
+
+    if (password.length < 6) {
+      setError('A nova senha precisa ter pelo menos 6 caracteres.')
+      return
+    }
+
+    if (password !== confirmation) {
+      setError('As senhas não conferem.')
+      return
+    }
+
+    await approveProfileWithoutPasswordDialog(passwordDialog, { password })
+    setPasswordDialog(null)
+    setAdminPassword('')
+    setAdminPasswordConfirm('')
   }
 
   return (
     <div className="p-6 space-y-5">
       {missingSchema && (
         <div className="rounded-2xl border border-yellow-100 bg-yellow-50 px-5 py-4 text-sm text-yellow-800 leading-relaxed">
-          O front do painel já está pronto, mas uma ou mais tabelas administrativas ainda não existem no Supabase.
-          Rode o SQL <strong>supabase/sql/04_admin_profile_requests.sql</strong> no SQL Editor.
+          Esta área administrativa ainda não está disponível.
+          Avise o responsável pelo painel para finalizar essa etapa.
         </div>
       )}
 
@@ -480,6 +515,55 @@ export default function AdminPanel({ initialTab = 'all' }) {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={Boolean(passwordDialog)}
+        onClose={() => {
+          if (!actionLoading) {
+            setPasswordDialog(null)
+            setAdminPassword('')
+            setAdminPasswordConfirm('')
+          }
+        }}
+        title="Definir nova senha"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            O e-mail de redefinição pode demorar ou não chegar. Defina uma senha temporária aqui e oriente o usuário a trocar depois que entrar.
+          </p>
+          <label className="block space-y-2">
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Nova senha</span>
+            <input
+              className="input-field"
+              type="password"
+              value={adminPassword}
+              onChange={(event) => setAdminPassword(event.target.value)}
+              placeholder="Mínimo de 6 caracteres"
+              autoFocus
+            />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Confirmar senha</span>
+            <input
+              className="input-field"
+              type="password"
+              value={adminPasswordConfirm}
+              onChange={(event) => setAdminPasswordConfirm(event.target.value)}
+              placeholder="Digite novamente"
+            />
+          </label>
+          <div className="rounded-2xl border border-yellow-100 bg-yellow-50 px-4 py-3 text-xs leading-relaxed text-yellow-800">
+            Não compartilhe a senha em locais públicos. Use uma senha temporária e peça para o usuário alterar depois.
+          </div>
+          <div className="flex justify-end gap-3 border-t border-border-soft pt-3">
+            <button className="btn-ghost" onClick={() => setPasswordDialog(null)} disabled={Boolean(actionLoading)}>Cancelar</button>
+            <button className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" onClick={handleConfirmPasswordApproval} disabled={Boolean(actionLoading)}>
+              {actionLoading ? 'Atualizando...' : 'Aprovar e trocar senha'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={Boolean(rejectDialog)}

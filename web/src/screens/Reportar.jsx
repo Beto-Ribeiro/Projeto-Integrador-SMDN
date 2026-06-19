@@ -3,6 +3,7 @@ import Card from '../components/Card'
 import Modal from '../components/Modal'
 import MapView from '../components/MapView'
 import { useAuth } from '../hooks/useAuth.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 import {
   countAlertsToday,
   countRecipients,
@@ -214,7 +215,7 @@ export default function Reportar() {
       setAlertsToday(todayResult)
       setRecipients(recipientsResult)
     } catch (err) {
-      setError(err.message || 'Não foi possível carregar alertas.')
+      setError(toFriendlyMessage(err, 'Não foi possível carregar alertas. Tente novamente.'))
     } finally {
       setLoading(false)
     }
@@ -268,7 +269,7 @@ export default function Reportar() {
       await loadReportarData()
       setTimeout(() => setSuccessMsg(''), 4000)
     } catch (err) {
-      setError(err.message || 'Não foi possível disparar o alerta.')
+      setError(toFriendlyMessage(err, 'Não foi possível disparar o alerta. Tente novamente.'))
     } finally {
       setDispatching(false)
     }

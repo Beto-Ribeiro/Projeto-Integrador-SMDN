@@ -6,6 +6,7 @@ import alertIcon from '../assets/auditoria/alert-triangle.svg'
 import recordIcon from '../assets/auditoria/flag.svg'
 import userIcon from '../assets/auditoria/user.svg'
 import { listAuditEvents } from '../backend/auditoria/auditService.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 
 const TYPE_CONFIG = {
   auth: { color: 'bg-text-main', light: 'bg-blue-50', text: 'text-text-main', icon: <img src={authIcon} width="20" height="20" alt="lock" /> },
@@ -100,7 +101,7 @@ export default function Auditoria() {
       const data = await listAuditEvents()
       setEntries(data)
     } catch (err) {
-      setError(err.message || 'Não foi possível carregar auditoria.')
+      setError(toFriendlyMessage(err, 'Não foi possível carregar auditoria. Tente novamente.'))
     } finally {
       setLoading(false)
     }

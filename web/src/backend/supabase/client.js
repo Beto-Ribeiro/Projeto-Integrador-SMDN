@@ -5,7 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
-    'Variáveis do Supabase ausentes. Confira VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo web/.env.'
+    'Não foi possível iniciar o sistema. Avise o responsável pelo painel para conferir a configuração de acesso.'
   )
 }
 

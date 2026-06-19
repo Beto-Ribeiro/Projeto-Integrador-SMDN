@@ -105,7 +105,7 @@ export async function getRelatoriosData(periodLabel) {
   })
 
   if (error) {
-    throw new Error(error.message || 'Não foi possível carregar os relatórios.')
+    throw new Error('Não foi possível carregar os relatórios. Tente novamente.')
   }
 
   return normalizeReportData(data)

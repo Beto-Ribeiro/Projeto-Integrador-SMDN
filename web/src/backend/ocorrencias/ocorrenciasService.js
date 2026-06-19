@@ -145,7 +145,7 @@ export async function getOcorrenciasData() {
   const { data, error } = await supabase.rpc('get_ocorrencias_data')
 
   if (error) {
-    throw new Error(error.message || 'Não foi possível carregar ocorrências.')
+    throw new Error('Não foi possível carregar ocorrências. Tente novamente.')
   }
 
   return {
@@ -165,7 +165,7 @@ export async function updateOcorrenciaStatus({ relatoId, status }) {
   })
 
   if (error) {
-    throw new Error(error.message || 'Não foi possível atualizar o status da ocorrência.')
+    throw new Error('Não foi possível atualizar o status da ocorrência. Tente novamente.')
   }
 
   return data

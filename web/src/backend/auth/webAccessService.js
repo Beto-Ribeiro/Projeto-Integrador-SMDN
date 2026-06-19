@@ -13,8 +13,8 @@ async function maybeGetSingle(table, idColumn, userId) {
     .maybeSingle()
 
   if (error) {
-    // Enquanto as policies ainda não existem, tabelas com RLS podem bloquear leitura.
-    // A gente ignora aqui para não derrubar a sessão por um erro de política em fase de migração.
+    // Em implantação, algumas leituras podem ser bloqueadas temporariamente.
+    // A gente ignora aqui para não derrubar a sessão por uma configuração incompleta.
     console.warn(`Não foi possível consultar ${table}:`, error.message)
     return null
   }
@@ -66,7 +66,7 @@ async function getWebAccessByRpc(authUser) {
   const { data, error } = await supabase.rpc('get_my_web_access')
 
   if (error) {
-    console.warn('[SMDN Auth] RPC get_my_web_access indisponível, usando fallback:', error.message)
+    console.warn('[SMDN Acesso] Validação principal indisponível, usando alternativa:', error.message)
     return null
   }
 
@@ -194,7 +194,7 @@ export async function createWebAccessRequest({ institution, name, email, role, a
   if (error) {
     if (isMissingRelationError(error)) {
       throw new Error(
-        'A tabela Solicitacao_Acesso_Web ainda não existe no Supabase. O front está pronto, mas falta aplicar o SQL de backend quando você liberar.'
+        'A solicitação de acesso ainda não está disponível. Avise o responsável pelo painel.'
       )
     }
 

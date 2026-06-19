@@ -54,7 +54,7 @@ export async function listAlerts(filters = {}) {
 
   if (error) {
     if (isMissingRelationError(error)) {
-      throw new Error('A tabela Alerta_Web ainda não existe. Rode o SQL supabase/sql/07_reportar_alerts.sql no Supabase.')
+      throw new Error('O envio de alertas ainda não está disponível. Avise o responsável pelo painel.')
     }
     throw error
   }
@@ -118,7 +118,7 @@ export async function dispatchAlert({ form, currentUser, recipients }) {
 
   if (error) {
     if (isMissingRelationError(error)) {
-      throw new Error('A tabela Alerta_Web ainda não existe. Rode o SQL supabase/sql/07_reportar_alerts.sql no Supabase.')
+      throw new Error('O envio de alertas ainda não está disponível. Avise o responsável pelo painel.')
     }
     throw error
   }

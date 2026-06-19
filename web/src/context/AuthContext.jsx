@@ -3,6 +3,7 @@ import { supabase } from '../backend/supabase/client.js'
 import { signInWithEmailAndPassword, signOutFromSupabase } from '../backend/auth/authService.js'
 import { getWebAccessForUser } from '../backend/auth/webAccessService.js'
 import { recordLoginActivity } from '../backend/perfil/profileActivityService.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 
 export const AuthContext = createContext()
 
@@ -77,7 +78,7 @@ export const AuthProvider = ({ children }) => {
 
     const access = await getWebAccessForUser(nextSession.user)
 
-    console.info('[SMDN Auth] Resultado da autorização web:', {
+    console.info('[SMDN Acesso] Resultado da autorização web:', {
       allowed: access?.allowed,
       role: access?.role,
       isAdmin: access?.isAdmin,
@@ -120,9 +121,9 @@ export const AuthProvider = ({ children }) => {
 
         await applySession(data?.session ?? null)
       } catch (error) {
-        console.error('[SMDN Auth] Erro ao carregar sessão:', error)
+        console.error('[SMDN Acesso] Erro ao carregar sessão:', error)
         if (mounted) {
-          setAccessError(error.message || 'Não foi possível carregar a sessão.')
+          setAccessError(toFriendlyMessage(error, 'Não foi possível carregar sua sessão. Entre novamente.'))
           setSession(null)
           setUser(null)
         }
@@ -139,15 +140,15 @@ export const AuthProvider = ({ children }) => {
       if (event === 'PASSWORD_RECOVERY') {
         setRecoveryMode(true)
       }
-      // Evita fazer consultas Supabase diretamente dentro do callback síncrono do Auth.
+      // Evita consultas diretas dentro do retorno síncrono da autenticação.
       setTimeout(() => {
         if (!mounted) return
 
         applySession(nextSession)
           .catch((error) => {
-            console.error('[SMDN Auth] Erro ao aplicar sessão:', error)
+            console.error('[SMDN Acesso] Erro ao aplicar sessão:', error)
             if (mounted) {
-              setAccessError(error.message || 'Não foi possível validar a sessão.')
+              setAccessError(toFriendlyMessage(error, 'Não foi possível confirmar seu acesso. Entre novamente.'))
               setSession(null)
               setUser(null)
             }
@@ -175,7 +176,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     await recordLoginActivity(access.user?.id).catch((error) => {
-      console.warn('[SMDN Auth] Login autenticado, mas a atividade de login não foi registrada:', error.message)
+      console.warn('[SMDN Acesso] Login confirmado, mas a atividade não foi registrada:', error.message)
     })
 
     return data
@@ -225,7 +226,7 @@ export const AuthProvider = ({ children }) => {
 
     if (error || !data?.session) {
       setSavedAccounts(removeSavedAccount(account.id))
-      throw new Error(error?.message || 'Não foi possível alternar para essa conta. Faça login novamente.')
+      throw new Error(toFriendlyMessage(error, 'Não foi possível alternar para essa conta. Faça login novamente.'))
     }
 
     return applySession(data.session, { signOutWhenUnauthorized: false })

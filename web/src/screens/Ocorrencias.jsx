@@ -7,6 +7,7 @@ import {
   subscribeOcorrenciasChanges,
   updateOcorrenciaStatus,
 } from '../backend/ocorrencias/ocorrenciasService.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 
 const SEVERITY_MAP = {
   critical: { label: 'Crítico', cls: 'badge-critical' },
@@ -48,7 +49,7 @@ export default function Ocorrencias() {
       const result = await getOcorrenciasData()
       setData(result)
     } catch (err) {
-      setError(err.message || 'Não foi possível carregar ocorrências.')
+      setError(toFriendlyMessage(err, 'Não foi possível carregar ocorrências. Tente novamente.'))
     } finally {
       setLoading(false)
     }
@@ -110,7 +111,7 @@ export default function Ocorrencias() {
       setNotice('Status da ocorrência atualizado.')
       setTimeout(() => setNotice(''), 3500)
     } catch (err) {
-      setError(err.message || 'Não foi possível atualizar o status.')
+      setError(toFriendlyMessage(err, 'Não foi possível atualizar o status. Tente novamente.'))
     } finally {
       setSavingStatus(false)
     }

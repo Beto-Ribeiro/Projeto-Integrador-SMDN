@@ -4,7 +4,7 @@
  * Exportação PDF  → html2canvas + jsPDF (captura só o div#relatorio-content)
  * Exportação Excel → SheetJS (xlsx) com múltiplas abas
  *
- * Dados reais → Supabase RPC public.get_relatorios_data(period)
+ * Dados reais do painel
  * Exportação PDF e Excel continuam usando o layout atual, sem mudar o design.
  *
  * Dependências necessárias:
@@ -15,6 +15,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import Card from '../components/Card'
 import externalIcon from '../assets/relatorios/external-link.svg'
 import { getRelatoriosData, subscribeRelatoriosChanges } from '../backend/relatorios/relatoriosService.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 
 // ─── Dependências de exportação ──────────────────────────────────────────────
@@ -25,7 +26,7 @@ import * as XLSX from 'xlsx'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOOK DE DADOS REAIS
-// Centraliza a chamada ao Supabase sem alterar o desenho visual da tela.
+// Centraliza a chamada aos dados sem alterar o desenho visual da tela.
 // ─────────────────────────────────────────────────────────────────────────────
 const EMPTY_REPORT_DATA = {
   kpis: {
@@ -78,7 +79,7 @@ function useReportData(period) {
       console.error('[SMDN Relatórios] Erro ao carregar dados reais:', err)
       setState((prev) => ({
         loading: false,
-        error: err?.message || 'Não foi possível carregar os relatórios.',
+        error: toFriendlyMessage(err, 'Não foi possível carregar os relatórios. Tente novamente.'),
         data: prev.data || EMPTY_REPORT_DATA,
       }))
     }
@@ -423,7 +424,7 @@ export default function Relatorios() {
       await exportToPDF(reportRef.current, period)
     } catch (err) {
       console.error('Erro ao gerar PDF:', err)
-      alert('Não foi possível gerar o PDF. Verifique o console.')
+      alert('Não foi possível gerar o PDF. Tente novamente.')
     } finally {
       setExporting(null)
     }
@@ -436,7 +437,7 @@ export default function Relatorios() {
       exportToExcel(data, period)
     } catch (err) {
       console.error('Erro ao gerar Excel:', err)
-      alert('Não foi possível gerar o Excel. Verifique o console.')
+      alert('Não foi possível gerar o Excel. Tente novamente.')
     } finally {
       setExporting(null)
     }
@@ -516,7 +517,7 @@ export default function Relatorios() {
 
       {loading && (
         <Card className="border border-blue-100 bg-blue-50/80">
-          <p className="text-sm font-semibold text-blue-900">Carregando dados reais do Supabase...</p>
+          <p className="text-sm font-semibold text-blue-900">Carregando dados do relatório...</p>
           <p className="text-xs text-blue-700 mt-1">A tela continua com o mesmo design, mas agora calcula tudo com Relato e Ocorrencia_Status.</p>
         </Card>
       )}

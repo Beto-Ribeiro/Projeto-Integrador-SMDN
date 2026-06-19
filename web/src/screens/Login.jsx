@@ -6,6 +6,7 @@ import logoClaro from '../assets/logo-claro.svg'
 import logoEscuro from '../assets/logo.svg'
 import SettingsPanel from '../components/SettingsPanel.jsx'
 import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 
 const Login = ({ view, setView, onLogin, onRegister }) => {
   const isRegister = view === 'cadastro'
@@ -44,7 +45,7 @@ const Login = ({ view, setView, onLogin, onRegister }) => {
       if (!isLoginValid) return
       await onLogin({ email, password, rememberMe })
     } catch (err) {
-      setError(err.message || 'Não foi possível concluir a ação.')
+      setError(toFriendlyMessage(err, 'Não foi possível concluir a ação. Tente novamente.'))
     } finally {
       setLoading(false)
     }

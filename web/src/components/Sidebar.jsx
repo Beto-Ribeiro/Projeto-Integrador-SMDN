@@ -20,6 +20,7 @@ import SettingsPanel from './SettingsPanel.jsx'
 import AssistantWidget from './AssistantWidget.jsx'
 import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 import { supabase } from '../backend/supabase/client.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 
 function getLocalDevBypass() {
   const isLocalhost =
@@ -242,7 +243,7 @@ export default function Sidebar({ currentScreen, setCurrentScreen, onLogout }) {
       await switchAccount(accountId)
       setShowProfilePopup(false)
     } catch (error) {
-      setAccountSwitchError(error.message || 'Não foi possível alternar a conta.')
+      setAccountSwitchError(toFriendlyMessage(error, 'Não foi possível alternar a conta. Faça login novamente.'))
     }
   }
 

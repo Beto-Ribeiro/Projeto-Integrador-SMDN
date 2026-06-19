@@ -4,21 +4,21 @@ function mapAuthError(error) {
   const message = String(error?.message || '')
 
   if (message.toLowerCase().includes('invalid login credentials')) {
-    return 'Credenciais inválidas no Supabase. Confira se o email é exatamente o usuário Auth e se a senha foi redefinida nesse usuário.'
+    return 'E-mail ou senha incorretos. Confira os dados e tente novamente.'
   }
 
   if (message.toLowerCase().includes('email not confirmed')) {
-    return 'Email ainda não confirmado no Supabase Auth.'
+    return 'Confirme seu e-mail antes de entrar no painel.'
   }
 
-  return message || 'Não foi possível autenticar no Supabase.'
+  return 'Não foi possível entrar no painel. Tente novamente.'
 }
 
 export async function signInWithEmailAndPassword({ email, password }) {
   const cleanEmail = email?.trim().toLowerCase()
   const cleanPassword = String(password ?? '')
 
-  console.info('[SMDN Auth] Tentando login no Supabase:', { email: cleanEmail })
+  console.info('[SMDN Login] Tentando entrada:', { email: cleanEmail })
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: cleanEmail,
@@ -26,7 +26,7 @@ export async function signInWithEmailAndPassword({ email, password }) {
   })
 
   if (error) {
-    console.error('[SMDN Auth] Erro no login:', {
+    console.error('[SMDN Login] Erro ao entrar:', {
       name: error.name,
       message: error.message,
       status: error.status,
@@ -34,13 +34,13 @@ export async function signInWithEmailAndPassword({ email, password }) {
     throw new Error(mapAuthError(error))
   }
 
-  console.info('[SMDN Auth] Login Auth OK:', {
+  console.info('[SMDN Login] Entrada confirmada:', {
     userId: data?.user?.id,
     hasSession: Boolean(data?.session),
   })
 
   if (!data?.session?.user) {
-    throw new Error('Supabase autenticou, mas não retornou sessão válida.')
+    throw new Error('Não foi possível confirmar sua entrada. Tente fazer login novamente.')
   }
 
   return data
@@ -49,5 +49,5 @@ export async function signInWithEmailAndPassword({ email, password }) {
 export async function signOutFromSupabase() {
   const { error } = await supabase.auth.signOut()
 
-  if (error) throw error
+  if (error) throw new Error('Não foi possível sair agora. Tente novamente.')
 }

@@ -11,6 +11,7 @@ import UserList from './screens/UserList.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import { useAuth } from './hooks/useAuth.js'
 import { createWebAccessRequest } from './backend/auth/webAccessService.js'
+import { toFriendlyMessage } from './utils/friendlyMessages.js'
 
 function AdminHomeScreen() {
   return <AdminPanel initialTab="all" />
@@ -104,7 +105,7 @@ export default function App() {
       <div className="flex h-screen w-full items-center justify-center bg-bg-main">
         <div className="rounded-2xl bg-white px-8 py-6 shadow-modal text-center">
           <p className="text-sm font-semibold text-slate-700">Carregando sessão...</p>
-          <p className="text-xs text-slate-400 mt-1">Validando acesso web no Supabase</p>
+          <p className="text-xs text-slate-400 mt-1">Preparando seu acesso ao painel</p>
         </div>
       </div>
     )

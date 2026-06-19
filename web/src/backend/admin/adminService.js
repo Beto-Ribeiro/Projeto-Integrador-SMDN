@@ -8,7 +8,7 @@ function emptyBecauseMissingSchema(error) {
   return {
     data: [],
     missingSchema: true,
-    message: error?.message || 'Tabela ainda não criada no Supabase. Aplique o SQL de backend quando essa etapa for liberada.',
+    message: 'Esta área administrativa ainda não está disponível. Avise o responsável pelo painel.',
   }
 }
 
@@ -62,7 +62,7 @@ async function syncAuthEmailByAdmin(userId, email) {
   })
 
   if (error) {
-    throw new Error(`Não foi possível atualizar o e-mail real de login: ${error.message}`)
+    throw new Error('Não foi possível atualizar o e-mail de entrada. Tente novamente ou avise o responsável pelo painel.')
   }
 
   return data
@@ -77,7 +77,30 @@ async function sendPasswordResetEmail(email) {
   })
 
   if (error) {
-    throw new Error(`A solicitação foi aprovada, mas não foi possível enviar o e-mail de redefinição de senha: ${error.message}`)
+    throw new Error('A solicitação foi aprovada, mas não foi possível enviar o e-mail de redefinição de senha. Tente novamente ou avise o responsável pelo painel.')
+  }
+
+  return data
+}
+
+async function setUserPasswordByAdmin(userId, password) {
+  const cleanPassword = String(password || '')
+
+  if (!userId) {
+    throw new Error('Usuário não encontrado para trocar a senha.')
+  }
+
+  if (cleanPassword.length < 6) {
+    throw new Error('A senha precisa ter pelo menos 6 caracteres.')
+  }
+
+  const { data, error } = await supabase.rpc('admin_set_user_password', {
+    p_user_id: userId,
+    p_new_password: cleanPassword,
+  })
+
+  if (error) {
+    throw new Error('Não foi possível trocar a senha pelo painel. Avise o responsável para aplicar a configuração de senha administrativa.')
   }
 
   return data
@@ -175,7 +198,7 @@ export async function approveAccessRequest(requestId) {
   })
 
   if (error) {
-    throw new Error('Aprovação automática depende da Edge Function approve-web-access-request. O painel já está preparado, mas a função ainda precisa ser criada/deployada no Supabase.')
+    throw new Error('A aprovação automática ainda não está disponível. Avise o responsável pelo painel.')
   }
 
   return data
@@ -192,7 +215,7 @@ function buildProfileUpdateFromChanges(changes = {}) {
   return payload
 }
 
-export async function approveProfileChangeRequest(request) {
+export async function approveProfileChangeRequest(request, options = {}) {
   const actorUserId = await getCurrentUserId()
   const actorName = await getProfileName(actorUserId)
   const changes = request.sap_alteracoes || {}
@@ -212,13 +235,21 @@ export async function approveProfileChangeRequest(request) {
     authEmailResult = await syncAuthEmailByAdmin(request.sap_user_id, changes.email.new)
   }
 
-  const resetTargetEmail = authEmailResult?.newEmail || changes.email?.new || request.sap_email_solicitante
+  let passwordUpdatedByAdmin = false
   if (changes.password) {
-    await sendPasswordResetEmail(resetTargetEmail)
+    if (options?.password) {
+      await setUserPasswordByAdmin(request.sap_user_id, options.password)
+      passwordUpdatedByAdmin = true
+    } else {
+      const resetTargetEmail = authEmailResult?.newEmail || changes.email?.new || request.sap_email_solicitante
+      await sendPasswordResetEmail(resetTargetEmail)
+    }
   }
 
   const passwordMessage = changes.password
-    ? ' E-mail de redefinição de senha enviado para o usuário.'
+    ? passwordUpdatedByAdmin
+      ? ' Senha atualizada pelo painel administrativo.'
+      : ' E-mail de redefinição de senha enviado para o usuário.'
     : ''
 
   const { data, error } = await supabase
@@ -254,7 +285,7 @@ export async function approveProfileChangeRequest(request) {
     entity_type: 'Solicitacao_Alteracao_Perfil',
     entity_id: request.sap_id,
     detail: `Alteração de perfil aprovada para ${request.sap_nome_solicitante || request.sap_email_solicitante || request.sap_user_id}.${passwordMessage}`,
-    metadata: { actorName, changes, authEmailUpdated: authEmailResult, passwordResetEmailSentTo: changes.password ? resetTargetEmail : null },
+    metadata: { actorName, changes, authEmailUpdated: authEmailResult, passwordUpdatedByAdmin },
   })
 
   return data

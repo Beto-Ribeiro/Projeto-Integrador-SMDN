@@ -3,6 +3,7 @@ import Card from '../components/Card'
 import Modal from '../components/Modal'
 import SettingsPanel from '../components/SettingsPanel'
 import { useAuth } from '../hooks/useAuth.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 import { formatBrazilPhone } from '../utils/phone.js'
 import { formatActivityDate, formatUserActivity, getActivityDetails, listUserActivities } from '../backend/perfil/profileActivityService.js'
 import { uploadAvatarFile } from '../backend/perfil/avatarService.js'
@@ -352,7 +353,7 @@ export default function Perfil() {
       const publicUrl = await uploadAvatarFile({ file, userId: user.id })
       setForm((current) => ({ ...current, avatarUrl: publicUrl }))
     } catch (err) {
-      setError(err.message || 'Não foi possível enviar a foto.')
+      setError(toFriendlyMessage(err, 'Não foi possível enviar a foto. Tente novamente.'))
     } finally {
       setUploadingAvatar(false)
       event.target.value = ''
@@ -379,7 +380,7 @@ export default function Perfil() {
       setSaved(true)
       setTimeout(() => setSaved(false), 4000)
     } catch (err) {
-      setError(err.message || 'Não foi possível atualizar a senha.')
+      setError(toFriendlyMessage(err, 'Não foi possível atualizar a senha. Tente novamente.'))
     } finally {
       setRecoverySaving(false)
     }
@@ -430,7 +431,7 @@ export default function Perfil() {
       setSaved(true)
       setTimeout(() => setSaved(false), 4000)
     } catch (err) {
-      setError(err.message || 'Não foi possível salvar as alterações.')
+      setError(toFriendlyMessage(err, 'Não foi possível salvar as alterações. Tente novamente.'))
     } finally {
       setSaving(false)
     }

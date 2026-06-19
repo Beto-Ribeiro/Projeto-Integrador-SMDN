@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import { useAuth } from '../hooks/useAuth.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 import { formatBrazilPhone } from '../utils/phone.js'
 import { uploadAvatarFile } from '../backend/perfil/avatarService.js'
 import { formatActivityDate, formatUserActivity, listUserActivities } from '../backend/perfil/profileActivityService.js'
@@ -151,7 +152,7 @@ export default function UserList() {
       const result = await listUsersForAdmin()
       setUsers(result.data)
     } catch (err) {
-      setError(err.message || 'Não foi possível carregar a lista de usuários.')
+      setError(toFriendlyMessage(err, 'Não foi possível carregar a lista de usuários. Tente novamente.'))
     } finally {
       setLoading(false)
     }
@@ -211,7 +212,7 @@ export default function UserList() {
       const publicUrl = await uploadAvatarFile({ file, userId: selectedUser.prf_id })
       setForm((current) => ({ ...current, avatarUrl: publicUrl }))
     } catch (err) {
-      setError(err.message || 'Não foi possível enviar a foto.')
+      setError(toFriendlyMessage(err, 'Não foi possível enviar a foto. Tente novamente.'))
     } finally {
       setUploadingAvatar(false)
       event.target.value = ''
@@ -263,7 +264,7 @@ export default function UserList() {
       closeEdit()
       await loadUsers()
     } catch (err) {
-      setError(err.message || 'Não foi possível atualizar o usuário.')
+      setError(toFriendlyMessage(err, 'Não foi possível atualizar o usuário. Tente novamente.'))
     } finally {
       setSaving(false)
     }
@@ -284,7 +285,7 @@ export default function UserList() {
       closeEdit()
       await loadUsers()
     } catch (err) {
-      setError(err.message || 'Não foi possível zerar o perfil do usuário.')
+      setError(toFriendlyMessage(err, 'Não foi possível zerar o perfil do usuário. Tente novamente.'))
     } finally {
       setResetting(false)
     }
@@ -413,7 +414,7 @@ export default function UserList() {
           </div>
 
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800 leading-relaxed">
-            Alterar o e-mail aqui também atualiza o e-mail real de login no Supabase Auth. Solicitações de senha aprovadas enviam e-mail de redefinição ao usuário.
+            Alterar o e-mail aqui também muda o e-mail usado para entrar no painel. Solicitações de senha aprovadas enviam um e-mail para o usuário redefinir a senha.
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-border-soft">

@@ -98,7 +98,7 @@ export async function requestProfileChange({ currentUser, form, requestPasswordR
 
   if (error) {
     if (error.code === '42P01' || String(error.message || '').toLowerCase().includes('does not exist')) {
-      throw new Error('A tabela Solicitacao_Alteracao_Perfil ainda não existe no Supabase. Rode o SQL do patch primeiro.')
+      throw new Error('A solicitação de alteração de perfil ainda não está disponível. Avise o responsável pelo painel.')
     }
     throw error
   }
@@ -134,7 +134,7 @@ export async function updateOwnProfileDirect({ currentUser, form, newPassword = 
     })
 
     if (authEmailError) {
-      throw new Error(`Perfil salvo, mas não foi possível atualizar o e-mail de login: ${authEmailError.message}`)
+      throw new Error('Perfil salvo, mas não foi possível alterar o e-mail de entrada. Tente novamente ou avise o responsável pelo painel.')
     }
   }
 

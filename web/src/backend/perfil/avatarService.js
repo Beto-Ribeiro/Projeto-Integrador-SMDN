@@ -39,7 +39,7 @@ export async function uploadAvatarFile({ file, userId }) {
 
   if (error) {
     if (String(error.message || '').toLowerCase().includes('bucket not found')) {
-      throw new Error('Bucket avatars ainda não existe. Rode o SQL 06_profile_avatar_storage.sql no Supabase.')
+      throw new Error('O envio de fotos ainda não está disponível. Avise o responsável pelo painel.')
     }
     throw error
   }

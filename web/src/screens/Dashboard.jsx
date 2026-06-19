@@ -20,6 +20,7 @@ import {
   formatOccurrenceDate,
   updateOcorrenciaStatus,
 } from '../backend/ocorrencias/ocorrenciasService.js'
+import { toFriendlyMessage } from '../utils/friendlyMessages.js'
 
 const SEVERITY_CONFIG = {
   critical: { label: 'Crítico', cls: 'badge-critical', dotColor: '#c60202', shape: 'critical', symbol: '◆' },
@@ -147,7 +148,7 @@ export default function Dashboard() {
       const data = await getDashboardData()
       setDashboard(data)
     } catch (err) {
-      setError(err.message || 'Não foi possível carregar o dashboard.')
+      setError(toFriendlyMessage(err, 'Não foi possível carregar o painel. Tente novamente.'))
     } finally {
       setLoading(false)
     }
@@ -196,7 +197,7 @@ export default function Dashboard() {
       await loadDashboard()
       setSelectedOcc((current) => current ? { ...current, status: statusDraft } : current)
     } catch (err) {
-      setError(err.message || 'Não foi possível atualizar o status.')
+      setError(toFriendlyMessage(err, 'Não foi possível atualizar o status. Tente novamente.'))
     } finally {
       setSavingStatus(false)
     }
@@ -213,7 +214,7 @@ export default function Dashboard() {
       await updateVictimAssistance({ victim, status: 'atendida' })
       await loadDashboard()
     } catch (err) {
-      setError(err.message || 'Não foi possível marcar a vítima como atendida.')
+      setError(toFriendlyMessage(err, 'Não foi possível marcar a vítima como atendida.'))
     } finally {
       setSavingVictimId('')
     }
