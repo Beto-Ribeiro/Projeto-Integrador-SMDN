@@ -2,6 +2,9 @@ import 'package:branch1/telas/Relatos.dart';
 import 'package:branch1/telas/login_tela.dart';
 import 'package:flutter/material.dart';
 import 'exportador_import.dart'; // Importa a tela do mapa
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 
 class TelaPrincipal extends StatefulWidget {
@@ -12,6 +15,28 @@ class TelaPrincipal extends StatefulWidget {
 }
 
 class _TelaPrincipalState extends State<TelaPrincipal> {
+
+  void initState() {
+    super.initState();
+    _Ask_for_permission(); // Chama a função de localização logo na entrada
+  }
+
+  Future<void> _Ask_for_permission() async {
+    // Solicita a permissão. Se o usuário já tiver aceitado antes, ele pula direto.
+    PermissionStatus status = await Permission.location.request();
+
+    if (status.isGranted) {
+      // Pega as coordenadas atuais do GPS
+      Position position = await Geolocator.getCurrentPosition();
+
+      // Move a câmera suavemente para a localização do usuário
+    } else if (status.isDenied || status.isPermanentlyDenied) {
+      debugPrint('Permissão de localização negada pelo usuário.');
+      // Opcional: Você pode exibir um aviso na tela se quiser
+    }
+  }
+
+
   // Inicia no índice 1 para abrir o Mapa logo de cara
   bool estalogado = false;
 
