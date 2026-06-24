@@ -81,7 +81,7 @@ class _TelaPerfilState extends State<TelaPerfil> {
         cpf.text = cidadao['cid_cpf'] ?? '';
 
         // HISTORICO
-        tipoSanguineo = historico['hmc_tipo_sanguineo'] ?? 'O+';
+        tipoSanguineo = historico['hmc_tipo_sanguineo'] ?? '';
 
         alergias.text = historico['hmc_alergias'] ?? '';
 
