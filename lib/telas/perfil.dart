@@ -34,14 +34,33 @@ class _TelaPerfilState extends State<TelaPerfil> {
   @override
   void initState() {
     super.initState();
-    carregarDados();
+    _esperarSessaoECarregar();
+  }
+
+  Future<void> _esperarSessaoECarregar() async {
+    // Se já tem usuário, carrega direto
+    if (supabase.auth.currentUser != null) {
+      carregarDados();
+      return;
+    }
+
+    // Aguarda o evento de sessão restaurada
+    supabase.auth.onAuthStateChange.listen((data) {
+      if (data.session != null && mounted) {
+        carregarDados();
+      }
+    });
   }
 
   Future<void> carregarDados() async {
     try {
       final userId = supabase.auth.currentUser?.id;
       print('=== USER ID: $userId ===');
-      if (userId == null) return;
+      if (userId == null) {
+        print('=== USUÁRIO NULO ===');
+        setState(() => carregando = false); // <-- não esquece de parar o loading
+        return;
+      }
 
       // ── PERFIL ────────────────────────────────────────────────────────────
       try {
