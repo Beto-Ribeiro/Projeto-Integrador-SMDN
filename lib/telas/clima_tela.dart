@@ -218,7 +218,6 @@ class _ClimaTelaState extends State<ClimaTela> {
 
               if (buscouClima)
                 Container(
-                  height: 150,
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
