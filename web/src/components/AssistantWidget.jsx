@@ -1,70 +1,47 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import assistantIcon from '../assets/assistant/assistant-icon.svg'
+import { askSmdnAssistant } from '../backend/ai/assistantService.js'
 
 const SCREEN_CONTEXT = {
   dashboard: {
     title: 'Dashboard',
-    intro: 'Posso te ajudar a entender o mapa, ocorrências críticas e alertas ativos.',
-    suggestions: [
-      ['Resumo da tela', 'Você está no Dashboard. Verifique primeiro as ocorrências críticas, depois compare mapa de calor com pontos para saber se há concentração territorial.'],
-      ['O que conferir?', 'Confira se os cards inferiores batem com a lista de ocorrências recentes. Se houver ocorrência sem localização, ela aparece na lista, mas não no mapa.'],
-    ],
+    intro: 'Ajude a entender mapa, ocorrências críticas, alertas ativos, vítimas e status operacional.',
+    suggestions: ['Resuma esta tela', 'O que devo conferir primeiro?'],
   },
   reportar: {
     title: 'Reportar',
-    intro: 'Posso revisar a mensagem antes de disparar um alerta.',
-    suggestions: [
-      ['Checklist de alerta', 'Antes de disparar: tipo do desastre, cidade/bairro, severidade, descrição objetiva e público destinatário.'],
-      ['Boa mensagem', 'Use frases curtas: o que aconteceu, onde, risco, orientação e fonte do alerta.'],
-    ],
+    intro: 'Ajude a revisar mensagens antes do disparo de alertas públicos.',
+    suggestions: ['Revise um alerta antes de disparar', 'Como escrever uma boa mensagem de alerta?'],
   },
   ocorrencias: {
     title: 'Ocorrências',
-    intro: 'Posso ajudar a priorizar relatos e status.',
-    suggestions: [
-      ['Prioridade', 'Priorize ocorrências críticas com localização e foto. Depois revise as em monitoramento e finalize as resolvidas.'],
-      ['Padrão de status', 'Pendente = precisa triagem. Em andamento = equipe acompanhando. Resolvida = sem ação pendente.'],
-    ],
+    intro: 'Ajude a priorizar relatos, status e ocorrências críticas.',
+    suggestions: ['Como priorizar ocorrências?', 'Explique os status de ocorrência'],
   },
   relatorios: {
     title: 'Relatórios',
-    intro: 'Posso sugerir leituras para apresentação.',
-    suggestions: [
-      ['Resumo executivo', 'Comece pelo total, taxa de resolução e severidade. Depois explique município e tipo mais frequentes.'],
-      ['Exportação', 'Use PDF para banca/apresentação e Excel para análise detalhada das ocorrências.'],
-    ],
+    intro: 'Ajude a interpretar KPIs, gráficos, municípios, tipos e severidades.',
+    suggestions: ['Gere um resumo executivo', 'O que destacar em uma apresentação?'],
   },
   auditoria: {
     title: 'Auditoria',
-    intro: 'Posso te ajudar a identificar responsável, alvo e impacto.',
-    suggestions: [
-      ['Como ler auditoria', 'Veja: responsável pela ação, pessoa afetada, tipo de evento, data e detalhes. Clique no registro para abrir o histórico completo.'],
-      ['Risco comum', 'Eventos sem alvo claro confundem revisão. Prefira registros que sempre tenham responsável, afetado e antes/depois.'],
-    ],
+    intro: 'Ajude a interpretar logs, responsáveis, ações e impacto das alterações.',
+    suggestions: ['Como ler os logs?', 'O que procurar em uma auditoria?'],
   },
   perfil: {
     title: 'Perfil',
-    intro: 'Posso revisar permissões e atividades recentes.',
-    suggestions: [
-      ['Permissões', 'Sem perfil e cidadão não entram no web. Funcionário e instituição entram no sistema. Apenas administrador acessa Administração.'],
-      ['Atividades', 'Passe o mouse para resumo e clique para abrir detalhes completos da atividade.'],
-    ],
+    intro: 'Ajude a entender permissões, perfil de usuário e atividades recentes.',
+    suggestions: ['Explique minhas permissões', 'Como interpretar atividades recentes?'],
   },
   admin: {
     title: 'Painel do Admin',
-    intro: 'Posso apoiar aprovação de solicitações.',
-    suggestions: [
-      ['Aprovação segura', 'Antes de aprovar, confira nome, e-mail, instituição, cargo e documento. Registre observação quando recusar.'],
-      ['Regra de acesso', 'Só administrador deve receber acesso ao painel administrativo. Funcionários/instituições acessam módulos operacionais.'],
-    ],
+    intro: 'Ajude a revisar solicitações de acesso e alterações administrativas.',
+    suggestions: ['Checklist para aprovar acesso', 'Como avaliar solicitação suspeita?'],
   },
   users: {
     title: 'Lista de Usuários',
-    intro: 'Posso ajudar a revisar vínculos e permissões.',
-    suggestions: [
-      ['Edição de usuário', 'Ao alterar tipo de perfil, revise permissões. O tipo administrador cria vínculo administrativo; outros tipos não devem ter admin.'],
-      ['Auditoria', 'Toda alteração importante deve deixar rastro em Atividade Recente e Auditoria.'],
-    ],
+    intro: 'Ajude a revisar vínculos, perfis e permissões de usuários.',
+    suggestions: ['Como revisar permissões?', 'Como identificar inconsistências de usuário?'],
   },
 }
 
@@ -90,8 +67,13 @@ function buildInitialMessages(context) {
 export default function AssistantWidget({ currentScreen, setCurrentScreen, compact = false }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
   const panelRef = useRef(null)
   const buttonRef = useRef(null)
+  const messagesEndRef = useRef(null)
 
   const context = useMemo(
     () => SCREEN_CONTEXT[currentScreen] || SCREEN_CONTEXT.dashboard,
@@ -104,13 +86,14 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
     }
   }, [context, messages.length, open])
 
-  function restartChat() {
-    setMessages(buildInitialMessages(context))
-  }
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, sending])
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (!open) return
+
       if (
         panelRef.current &&
         !panelRef.current.contains(event.target) &&
@@ -121,16 +104,67 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
       }
     }
 
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [open])
 
-  function sendSuggestion(label, response) {
-    setMessages((current) => [
-      ...current,
-      { role: 'user', text: label },
-      { role: 'assistant', text: response },
-    ])
+  function restartChat() {
+    setMessages(buildInitialMessages(context))
+    setDraft('')
+    setError('')
+  }
+
+  async function sendToGemini(text) {
+    const cleanText = String(text || '').trim()
+
+    if (!cleanText || sending) return
+
+    setError('')
+    setSending(true)
+    setDraft('')
+
+    const userMessage = { role: 'user', text: cleanText }
+    const historyBeforeSend = messages
+
+    setMessages((current) => [...current, userMessage])
+
+    try {
+      const result = await askSmdnAssistant({
+        message: cleanText,
+        currentScreen,
+        screenTitle: context.title,
+        screenIntro: context.intro,
+        history: historyBeforeSend,
+      })
+
+      setMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          text: result.text || 'Não consegui gerar uma resposta agora.',
+        },
+      ])
+    } catch (err) {
+      setError(err?.message || 'Não foi possível consultar a IA.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    sendToGemini(draft)
   }
 
   return (
@@ -150,7 +184,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
       {open && (
         <div
           ref={panelRef}
-          className={`fixed bottom-16 ${compact ? 'left-[70px]' : 'left-[210px]'} z-[99998] w-[360px] max-h-[calc(100vh-5rem)] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col`}
+          className={`fixed bottom-16 ${compact ? 'left-[70px]' : 'left-[210px]'} z-[99998] w-[380px] max-h-[calc(100vh-5rem)] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col`}
           role="dialog"
           aria-label="Assistente IA SMDN"
         >
@@ -162,19 +196,21 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
             >
               Reiniciar chat
             </button>
+
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-lg p-2 text-slate-400 hover:bg-white/60 hover:text-slate-700"
+              className="rounded-lg p-2 text-slate-400 hover:bg-white/60 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
               aria-label="Fechar assistente"
             >
               ×
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3" aria-live="polite">
             {messages.map((message, index) => {
               const isAssistant = message.role === 'assistant'
+
               return (
                 <div
                   key={`${message.role}-${index}`}
@@ -188,8 +224,9 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                       aria-hidden="true"
                     />
                   )}
+
                   <div
-                    className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                    className={`rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                       isAssistant
                         ? 'bg-slate-100 text-slate-700 mr-3'
                         : 'bg-text-main text-white ml-8'
@@ -200,19 +237,71 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                 </div>
               )
             })}
+
+            {sending && (
+              <div className="flex items-start gap-2 justify-start">
+                <img
+                  src={assistantIcon}
+                  alt=""
+                  className="mt-0.5 h-8 w-8 rounded-xl border border-border-soft object-cover flex-shrink-0"
+                  aria-hidden="true"
+                />
+                <div className="rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-700 mr-3">
+                  IA SMDN está pensando...
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="border-t border-border-soft p-4 space-y-2">
-            {context.suggestions.map(([label, response]) => (
+            <div className="grid gap-2">
+              {context.suggestions.map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => sendToGemini(label)}
+                  disabled={sending}
+                  className="w-full rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-2 pt-2">
+              <label htmlFor="smdn-ai-message" className="sr-only">
+                Mensagem para IA SMDN
+              </label>
+
+              <textarea
+                id="smdn-ai-message"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Pergunte algo sobre esta tela..."
+                rows={3}
+                disabled={sending}
+                className="w-full resize-none rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main disabled:opacity-60"
+              />
+
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                >
+                  {error}
+                </p>
+              )}
+
               <button
-                key={label}
-                type="button"
-                onClick={() => sendSuggestion(label, response)}
-                className="w-full rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                type="submit"
+                disabled={sending || !draft.trim()}
+                className="w-full rounded-xl bg-text-main px-3 py-2 text-sm font-bold text-white hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {label}
+                {sending ? 'Consultando IA...' : 'Enviar para IA'}
               </button>
-            ))}
+            </form>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
@@ -222,6 +311,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
               >
                 Ver relatórios
               </button>
+
               <button
                 type="button"
                 onClick={() => setCurrentScreen('auditoria')}

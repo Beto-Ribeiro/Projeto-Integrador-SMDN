@@ -1,109 +1,152 @@
-// Esqueleto opcional para uma Edge Function futura: approve-web-access-request
-// NÃO está deployado. NÃO colocar service_role no frontend.
-// Esta função deve rodar no Supabase Edge Functions, com SUPABASE_SERVICE_ROLE_KEY no ambiente seguro.
+// @ts-nocheck
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-3.5-flash'
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_API_KEY')
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+function json(payload: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json; charset=utf-8',
+    },
+  })
+}
+
+function sanitizeText(value: unknown, maxLength = 4000) {
+  return String(value || '').trim().slice(0, maxLength)
+}
+
+function normalizeHistory(history: unknown) {
+  if (!Array.isArray(history)) return ''
+
+  return history
+    .slice(-8)
+    .map((item) => {
+      const role = item?.role === 'assistant' ? 'IA SMDN' : 'Usuário'
+      const text = sanitizeText(item?.text, 1200)
+      return text ? `${role}: ${text}` : ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function buildPrompt(body: Record<string, unknown>) {
+  const screenTitle = sanitizeText(body.screenTitle || body.currentScreen || 'SMDN', 120)
+  const screenIntro = sanitizeText(body.screenIntro, 500)
+  const history = normalizeHistory(body.history)
+  const message = sanitizeText(body.message, 2000)
+
+  return [
+    `Tela atual: ${screenTitle}`,
+    screenIntro ? `Contexto da tela: ${screenIntro}` : '',
+    history ? `Histórico recente:\n${history}` : '',
+    `Pergunta do usuário:\n${message}`,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function extractGeminiText(payload: Record<string, unknown>) {
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : []
+  const parts = candidates[0]?.content?.parts
+
+  if (!Array.isArray(parts)) return ''
+
+  return parts
+    .map((part) => typeof part?.text === 'string' ? part.text : '')
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+}
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 })
+    return json({ error: 'Método não permitido.' }, 405)
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Missing Authorization header' }), { status: 401 })
-  }
+  try {
+    if (!GEMINI_API_KEY) {
+      return json({
+        error: 'A IA ainda não está configurada. Defina GEMINI_API_KEY nos secrets do Supabase.',
+      }, 500)
+    }
 
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-  const supabaseUser = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  })
+    const body = await req.json().catch(() => ({}))
+    const message = sanitizeText(body.message, 2000)
 
-  const {
-    data: { user: caller },
-    error: callerError,
-  } = await supabaseUser.auth.getUser()
+    if (!message) {
+      return json({ error: 'Digite uma mensagem para a IA.' }, 400)
+    }
 
-  if (callerError || !caller) {
-    return new Response(JSON.stringify({ error: 'Invalid caller' }), { status: 401 })
-  }
+    const prompt = buildPrompt(body)
 
-  const { data: adminProfile } = await supabaseAdmin
-    .from('Administrador')
-    .select('adm_id')
-    .eq('adm_id', caller.id)
-    .maybeSingle()
-
-  if (!adminProfile) {
-    return new Response(JSON.stringify({ error: 'Only administrators can approve requests' }), { status: 403 })
-  }
-
-  const { requestId } = await req.json()
-
-  const { data: request, error: requestError } = await supabaseAdmin
-    .from('Solicitacao_Acesso_Web')
-    .select('*')
-    .eq('saw_id', requestId)
-    .eq('saw_status', 'pendente')
-    .single()
-
-  if (requestError || !request) {
-    return new Response(JSON.stringify({ error: 'Request not found or already reviewed' }), { status: 404 })
-  }
-
-  // Estratégia recomendada:
-  // 1. Convide o usuário por email OU crie o usuário com senha temporária.
-  // 2. Insira em Perfis com prf_tipo = funcionario/instituicao/admin conforme regra.
-  // 3. Insira em Funcionario ou Instituicao conforme o tipo aprovado.
-  // 4. Marque a solicitação como aprovada.
-  // 5. Grave Audit_Log.
-
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-    request.saw_email
-  )
-
-  if (inviteError) {
-    return new Response(JSON.stringify({ error: inviteError.message }), { status: 400 })
-  }
-
-  const newUserId = inviteData.user?.id
-
-  if (!newUserId) {
-    return new Response(JSON.stringify({ error: 'Could not create auth user' }), { status: 400 })
-  }
-
-  await supabaseAdmin.from('Perfis').upsert({
-    prf_id: newUserId,
-    prf_nome: request.saw_nome,
-    prf_tipo: 'funcionario',
-  })
-
-  await supabaseAdmin.from('Funcionario').upsert({
-    fun_id: newUserId,
-    fun_cargo: request.saw_cargo || request.saw_tipo_agente || 'Agente autorizado',
-  })
-
-  await supabaseAdmin
-    .from('Solicitacao_Acesso_Web')
-    .update({
-      saw_status: 'aprovado',
-      saw_reviewed_by: caller.id,
-      saw_reviewed_at: new Date().toISOString(),
+    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        systemInstruction: {
+          parts: [
+            {
+              text: [
+                'Você é a IA SMDN, assistente operacional do Sistema de Monitoramento de Desastres Naturais.',
+                'Responda sempre em português do Brasil.',
+                'Ajude agentes públicos a entender telas, priorizar ocorrências, revisar alertas, interpretar relatórios e consultar auditoria.',
+                'Não invente dados do sistema.',
+                'Use apenas o contexto recebido na pergunta.',
+                'Em emergência real, oriente seguir protocolos oficiais da Defesa Civil, Bombeiros, SAMU ou autoridade competente.',
+                'Nunca substitua a decisão técnica da autoridade responsável.',
+              ].join(' '),
+            },
+          ],
+        },
+        generationConfig: {
+          temperature: 0.4,
+          topP: 0.9,
+          maxOutputTokens: 1600,
+        },
+      }),
     })
-    .eq('saw_id', requestId)
 
-  await supabaseAdmin.from('Audit_Log').insert({
-    actor_user_id: caller.id,
-    action: 'approve_web_access_request',
-    entity_type: 'Solicitacao_Acesso_Web',
-    entity_id: requestId,
-    detail: `Solicitação aprovada para ${request.saw_email}`,
-  })
+    const payload = await response.json().catch(() => ({}))
 
-  return new Response(JSON.stringify({ success: true, userId: newUserId }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
+    if (!response.ok) {
+      return json({
+        error: payload?.error?.message || 'Não foi possível consultar a IA agora.',
+      }, response.status)
+    }
+
+    const text = extractGeminiText(payload) || 'Não consegui gerar uma resposta agora.'
+
+    return json({
+      text,
+      model: GEMINI_MODEL,
+    })
+  } catch (error) {
+    return json({
+      error: error?.message || 'Erro inesperado ao consultar a IA.',
+    }, 500)
+  }
 })
