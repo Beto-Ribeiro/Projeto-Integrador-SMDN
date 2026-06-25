@@ -28,7 +28,8 @@ class ContainerPerfilSuperior extends StatelessWidget{
               child: InkWell(
                 borderRadius: BorderRadius.circular(33),
                 onTap: () {
-                  onChangePage(4);
+                  // TODO: Navegar para a tela de perfil quando existir
+                  // onChangePage(?);
                 },
 
                 child: Container(

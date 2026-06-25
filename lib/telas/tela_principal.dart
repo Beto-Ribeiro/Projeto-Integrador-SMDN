@@ -1,7 +1,6 @@
 import 'package:branch1/telas/Relatos.dart';
 import 'package:flutter/material.dart';
-import 'exportador_import.dart'; // Importa a tela do mapa
-
+import 'exportador_import.dart';
 
 class TelaPrincipal extends StatefulWidget {
   const TelaPrincipal({super.key});
@@ -10,11 +9,11 @@ class TelaPrincipal extends StatefulWidget {
   State<TelaPrincipal> createState() => _TelaPrincipalState();
 }
 
-class _TelaPrincipalState extends State<TelaPrincipal> {
-  // Inicia no índice 1 para abrir o Mapa logo de cara
-  bool estalogado = false;
-
+class _TelaPrincipalState extends State<TelaPrincipal>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+  late AnimationController _nimboAnimController;
+  late Animation<double> _nimboScaleAnim;
 
   void changePage(int index) {
     setState(() {
@@ -22,16 +21,37 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     });
   }
 
-  // Definição das 4 páginas correspondentes aos ícones
+  @override
+  void initState() {
+    super.initState();
+    _nimboAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+      lowerBound: 0.0,
+      upperBound: 1.0,
+    )..value = 1.0;
+    _nimboScaleAnim = CurvedAnimation(
+      parent: _nimboAnimController,
+      curve: Curves.easeOutBack,
+    );
+  }
+
+  @override
+  void dispose() {
+    _nimboAnimController.dispose();
+    super.dispose();
+  }
+
   late final List<Widget> _telas = [
-     Home(title: "SOS", onChangePage: changePage),
-     Maps_alertas(title:"SOS", onChangePage: changePage,), // O MAPA É A SEGUNDA PÁGINA (Índice 1)
-     Relatos_tela(title: "Relato", onChangePage: changePage),
-     Scaffold(body: Center(child: Text('Página: Clima', style: TextStyle(fontSize: 24)))),
-     Cadastro_tela(title: "Cadastro", onChangePage: changePage),
+    Home(title: "SOS", onChangePage: changePage),                         // 0
+    Maps_alertas(title: "SOS", onChangePage: changePage),                 // 1 — Mapa
+    Relatos_tela(title: "Relato", onChangePage: changePage),              // 2
+    Scaffold(body: Center(child: Text('Página: Clima', style: TextStyle(fontSize: 24)))), // 3 — placeholder
+    ChatbotTela(title: 'Nimbo', onChangePage: changePage),                // 4 — Chatbot IA
+    Cadastro_tela(title: "Cadastro", onChangePage: changePage),           // 5 — oculta nav
   ];
 
-  // Os ícones na exata ordem do design
+  // Somente os 4 ícones principais — Nimbo fica como botão flutuante
   final List<IconData> _icones = [
     Icons.warning_amber_rounded,
     Icons.location_on_outlined,
@@ -41,20 +61,78 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
 
   @override
   Widget build(BuildContext context) {
+    final bool mostrarNav = _currentIndex != 5;
+
     return Scaffold(
-      extendBody: true, // Garante que o mapa passe por trás da barra transparente
-      body: _telas[_currentIndex],
-      bottomNavigationBar: _currentIndex == 4
-          ? null
-          :CustomAnimatedBottomBar(
-        currentIndex: _currentIndex,
-        icones: _icones,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+      extendBody: true,
+      body: Stack(
+        children: [
+          // ── Conteúdo principal ───────────────────────────────────────────
+          _telas[_currentIndex],
+
+          // ── Botão Nimbo flutuante (acima da nav, canto inferior direito) ─
+          // Oculta quando já estamos na página do chatbot (índice 4)
+          if (mostrarNav && _currentIndex != 4)
+            Positioned(
+              bottom: 78, // fica logo acima da nav bar (altura 70)
+              right: 20,
+              child: ScaleTransition(
+                scale: _nimboScaleAnim,
+                child: GestureDetector(
+                  onTapDown: (_) => _nimboAnimController.reverse(),
+                  onTapUp: (_) {
+                    _nimboAnimController.forward();
+                    setState(() => _currentIndex = 4);
+                  },
+                  onTapCancel: () => _nimboAnimController.forward(),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B1426),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(32),
+                        topRight: Radius.circular(32),
+                        bottomLeft: Radius.circular(32),
+                        bottomRight: Radius.circular(4),
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.15),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Image.asset(
+                        'gfx/png/Image/nimbo_icon.png',
+                        fit: BoxFit.contain,
+                        isAntiAlias: true,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
+      bottomNavigationBar: mostrarNav
+          ? CustomAnimatedBottomBar(
+              currentIndex: _currentIndex < 4 ? _currentIndex : -1,
+              icones: _icones,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            )
+          : null,
     );
   }
 }
@@ -82,7 +160,12 @@ class CustomAnimatedBottomBar extends StatelessWidget {
     return SizedBox(
       height: 90,
       child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: currentIndex.toDouble(), end: currentIndex.toDouble()),
+        tween: Tween<double>(
+          // Quando nenhum item está seleccionado (currentIndex < 0), move o
+          // notch para fora do ecrã (posição -1) para não tapar nenhum ícone.
+          begin: currentIndex < 0 ? -1.0 : currentIndex.toDouble(),
+          end: currentIndex < 0 ? -1.0 : currentIndex.toDouble(),
+        ),
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOutBack,
         builder: (context, value, child) {
@@ -109,7 +192,7 @@ class CustomAnimatedBottomBar extends StatelessWidget {
                             height: 70,
                             child: Icon(
                               icones[index],
-                              color: currentIndex == index ? Colors.transparent : corIconeInativo,
+                              color: currentIndex == index ? Colors.transparent : corIconeInativo.withOpacity(currentIndex < 0 ? 1.0 : 1.0),
                               size: 28,
                             ),
                           ),
@@ -119,23 +202,24 @@ class CustomAnimatedBottomBar extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
-                top: 0,
-                left: buttonLeftOffset,
-                child: GestureDetector(
-                  onTap: () => onTap(currentIndex),
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: corFundoMenu,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3.5),
+              if (currentIndex >= 0)
+                Positioned(
+                  top: 0,
+                  left: buttonLeftOffset,
+                  child: GestureDetector(
+                    onTap: () => onTap(currentIndex),
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: corFundoMenu,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3.5),
+                      ),
+                      child: Icon(icones[currentIndex], color: Colors.white, size: 28),
                     ),
-                    child: Icon(icones[currentIndex], color: Colors.white, size: 28),
                   ),
                 ),
-              ),
             ],
           );
         },

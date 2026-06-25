@@ -69,6 +69,7 @@ flutter:
     - gfx/png/Image/
     - gfx/svg/icons/
     - gfx/svg/Image/
+    - gfx/svg/image/
     - gfx/diverse_types/
 
   # To add assets to your application, add an assets section, like this:

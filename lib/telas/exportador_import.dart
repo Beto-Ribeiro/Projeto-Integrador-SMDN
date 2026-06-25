@@ -8,3 +8,4 @@ export 'package:branch1/main.dart';
 export 'tela_principal.dart';
 export 'maps_alertas.dart';
 export 'cadastro_tela.dart';
+export 'chatbot_tela.dart';
