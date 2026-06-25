@@ -29,7 +29,7 @@ class ContainerPerfilSuperior extends StatelessWidget{
               child: InkWell(
                 borderRadius: BorderRadius.circular(33),
                 onTap: () {
-
+                    onChangePage(8);
                 },
 
                 child: Container(

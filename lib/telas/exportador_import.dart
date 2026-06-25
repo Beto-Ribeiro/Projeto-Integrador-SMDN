@@ -11,3 +11,4 @@ export 'maps_alertas.dart';
 export 'cadastro_tela.dart';
 export 'sLogCad.dart';
 export 'confEmail.dart';
+export 'perfil.dart';
