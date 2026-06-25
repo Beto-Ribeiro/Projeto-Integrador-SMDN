@@ -79,6 +79,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
         senha: senhaCadastro,
       ),
       sLogin(title: "Login", onChangePage: changePage),                      // 7
+      TelaPerfil(title: "Perfil", onChangePage: changePage)
     ];
   }
 
@@ -114,7 +115,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
       (_currentIndex == 4 ||
           _currentIndex == 5 ||
           _currentIndex == 6 ||
-          _currentIndex == 7)
+          _currentIndex == 7 || _currentIndex == 8)
           ? null
           : CustomAnimatedBottomBar(
         currentIndex: _currentIndex,
