@@ -387,7 +387,7 @@ class _Home_State extends State<Home> {
                             ),
                           ),
 
-                          const SizedBox(height: 130, width: double.infinity),
+                          const SizedBox(height: 90, width: double.infinity),
                         ],
                       ),
                     ),
