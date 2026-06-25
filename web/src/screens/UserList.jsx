@@ -130,6 +130,61 @@ function Avatar({ user, size = 'lg' }) {
   )
 }
 
+
+function normalizeAiSearch(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function userToAiContext(user) {
+  const permissions = permissionsForType(user?.prf_permissoes, user?.prf_tipo)
+
+  return {
+    id: user?.prf_id,
+    name: user?.prf_nome || 'Usuário sem nome',
+    type: roleLabel(user?.prf_tipo),
+    rawType: user?.prf_tipo || '',
+    email: user?.prf_email_contato || null,
+    phone: user?.prf_telefone || null,
+    createdAt: user?.prf_created_at || null,
+    access: userAccessSummary(user) || 'Sem acesso ao painel web',
+    permissions: Object.entries(PERMISSION_LABELS).map(([key, label]) => ({
+      key,
+      label,
+      enabled: Boolean(permissions?.[key]),
+    })),
+  }
+}
+
+function findUserByAiQuery(users, query) {
+  const search = normalizeAiSearch(query)
+  if (!search) return null
+
+  const exact = users.find((user) => {
+    return [user.prf_nome, user.prf_email_contato, user.prf_id]
+      .filter(Boolean)
+      .some((value) => normalizeAiSearch(value) === search)
+  })
+
+  if (exact) return exact
+
+  return users.find((user) => {
+    const content = normalizeAiSearch([
+      user.prf_nome,
+      user.prf_tipo,
+      user.prf_email_contato,
+      user.prf_telefone,
+      user.prf_id,
+      roleLabel(user.prf_tipo),
+    ].filter(Boolean).join(' '))
+
+    return content.includes(search) || search.split(/\s+/).filter((part) => part.length >= 3).every((part) => content.includes(part))
+  }) || null
+}
+
 export default function UserList() {
   const { user: currentUser, refreshUser } = useAuth()
   const [users, setUsers] = useState([])
@@ -185,6 +240,44 @@ export default function UserList() {
       return content.includes(search)
     })
   }, [users, query])
+
+  useEffect(() => {
+    window.__SMDN_AI_USERS = users.map(userToAiContext)
+    window.dispatchEvent(new CustomEvent('smdn-ai-users-context-updated', {
+      detail: { users: window.__SMDN_AI_USERS },
+    }))
+  }, [users])
+
+  useEffect(() => {
+    function handleAiUserAction(event) {
+      const action = event?.detail || window.__SMDN_AI_PENDING_USER_ACTION
+      if (!action || users.length === 0) return
+
+      const searchText = action.query || action.name || action.id || ''
+      const normalizedMode = String(action.mode || action.type || '').toLowerCase()
+      const shouldOpen = normalizedMode === 'open' || normalizedMode === 'open_user'
+
+      if (searchText) {
+        setQuery(searchText)
+      }
+
+      if (shouldOpen) {
+        const match = findUserByAiQuery(users, searchText)
+        if (match) {
+          openEdit(match)
+        }
+      }
+
+      window.__SMDN_AI_PENDING_USER_ACTION = null
+    }
+
+    window.addEventListener('smdn-ai-users-action', handleAiUserAction)
+    handleAiUserAction({ detail: window.__SMDN_AI_PENDING_USER_ACTION })
+
+    return () => {
+      window.removeEventListener('smdn-ai-users-action', handleAiUserAction)
+    }
+  }, [users])
 
   function openEdit(user) {
     setSelectedUser(user)

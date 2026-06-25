@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import assistantIcon from '../assets/assistant/assistant-icon.svg'
 import { askSmdnAssistant } from '../backend/ai/assistantService.js'
+import { buildSmdnOperationalContext } from '../backend/ai/smdnContextService.js'
 
 const SCREEN_CONTEXT = {
   dashboard: {
@@ -59,9 +60,62 @@ function buildInitialMessages(context) {
   return [
     {
       role: 'assistant',
-      text: `Oi! Estou vendo a tela ${context.title}. ${context.intro}`,
+      text: `Oi! Estou vendo a tela ${context.title}. Posso consultar os dados reais do SMDN e te ajudar com usuários, auditoria, ocorrências e prioridades.`,
     },
   ]
+}
+
+function renderInlineMarkdown(text) {
+  const parts = String(text || '').split(/(\*\*[^*]+\*\*)/g)
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={index} className="font-extrabold text-inherit">
+          {part.slice(2, -2)}
+        </strong>
+      )
+    }
+
+    return <Fragment key={index}>{part}</Fragment>
+  })
+}
+
+function renderMessageText(text) {
+  const lines = String(text || '').split('\n')
+
+  return lines.map((line, index) => {
+    const bullet = line.match(/^\s*\*\s+(.*)$/)
+    const content = bullet ? bullet[1] : line
+
+    return (
+      <Fragment key={`${line}-${index}`}>
+        {bullet ? (
+          <span className="block pl-4 -indent-4">
+            <span aria-hidden="true">• </span>
+            {renderInlineMarkdown(content)}
+          </span>
+        ) : (
+          <span>{renderInlineMarkdown(content)}</span>
+        )}
+        {index < lines.length - 1 && !bullet && <br />}
+      </Fragment>
+    )
+  })
+}
+
+function scheduleUiEvent(name, detail, delay = 180) {
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent(name, { detail }))
+  }, delay)
+}
+
+function normalizeAction(action) {
+  if (!action || typeof action !== 'object') return null
+  return {
+    ...action,
+    type: String(action.type || '').trim().toLowerCase(),
+  }
 }
 
 export default function AssistantWidget({ currentScreen, setCurrentScreen, compact = false }) {
@@ -125,6 +179,57 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
     setError('')
   }
 
+  function applyAssistantActions(actions = []) {
+    const normalizedActions = actions.map(normalizeAction).filter(Boolean)
+
+    for (const action of normalizedActions) {
+      if (action.type === 'navigate' && SCREEN_CONTEXT[action.screen]) {
+        setCurrentScreen(action.screen)
+      }
+
+      if (action.type === 'open_user') {
+        const detail = {
+          mode: 'open',
+          query: action.query || action.name || action.id || '',
+        }
+        window.__SMDN_AI_PENDING_USER_ACTION = detail
+        setCurrentScreen('users')
+        scheduleUiEvent('smdn-ai-users-action', detail)
+      }
+
+      if (action.type === 'filter_users') {
+        const detail = {
+          mode: 'filter',
+          query: action.query || action.role || action.type || '',
+        }
+        window.__SMDN_AI_PENDING_USER_ACTION = detail
+        setCurrentScreen('users')
+        scheduleUiEvent('smdn-ai-users-action', detail)
+      }
+
+      if (action.type === 'open_dashboard_occurrence') {
+        const detail = {
+          id: action.id || action.relatoId || '',
+          query: action.query || action.title || '',
+        }
+        window.__SMDN_AI_PENDING_DASHBOARD_ACTION = detail
+        setCurrentScreen('dashboard')
+        scheduleUiEvent('smdn-ai-dashboard-open-occurrence', detail)
+      }
+
+      if (action.type === 'filter_audit') {
+        const detail = {
+          query: action.query || '',
+          type: action.auditType || action.kind || action.filterType || '',
+          openFirst: action.openFirst !== false,
+        }
+        window.__SMDN_AI_PENDING_AUDIT_ACTION = detail
+        setCurrentScreen('auditoria')
+        scheduleUiEvent('smdn-ai-audit-action', detail)
+      }
+    }
+  }
+
   async function sendToGemini(text) {
     const cleanText = String(text || '').trim()
 
@@ -140,13 +245,21 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
     setMessages((current) => [...current, userMessage])
 
     try {
+      const operationalContext = await buildSmdnOperationalContext({
+        question: cleanText,
+        currentScreen,
+      })
+
       const result = await askSmdnAssistant({
         message: cleanText,
         currentScreen,
         screenTitle: context.title,
         screenIntro: context.intro,
         history: historyBeforeSend,
+        operationalContext,
       })
+
+      applyAssistantActions(result.actions)
 
       setMessages((current) => [
         ...current,
@@ -184,7 +297,16 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
       {open && (
         <div
           ref={panelRef}
-          className={`fixed bottom-16 ${compact ? 'left-[70px]' : 'left-[210px]'} z-[99998] w-[380px] max-h-[calc(100vh-5rem)] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col`}
+          className={`fixed bottom-16 ${compact ? 'left-[70px]' : 'left-[210px]'} z-[99998] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col`}
+          style={{
+            resize: 'both',
+            width: '420px',
+            height: 'min(760px, calc(100vh - 5rem))',
+            minWidth: '340px',
+            minHeight: '430px',
+            maxWidth: 'min(90vw, 760px)',
+            maxHeight: 'calc(100vh - 5rem)',
+          }}
           role="dialog"
           aria-label="Assistente IA SMDN"
         >
@@ -232,7 +354,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                         : 'bg-text-main text-white ml-8'
                     }`}
                   >
-                    {message.text}
+                    {renderMessageText(message.text)}
                   </div>
                 </div>
               )
@@ -247,7 +369,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                   aria-hidden="true"
                 />
                 <div className="rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-700 mr-3">
-                  IA SMDN está pensando...
+                  Consultando dados reais do SMDN e pensando...
                 </div>
               </div>
             )}

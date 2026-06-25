@@ -100,6 +100,67 @@ function toMapVictims(victims) {
     }))
 }
 
+
+function normalizeAiSearch(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function occurrenceToAiContext(occurrence) {
+  return {
+    id: occurrence?.id,
+    relatoId: occurrence?.relatoId,
+    title: occurrence?.title,
+    type: occurrence?.type,
+    severity: occurrence?.severity,
+    riskLabel: occurrence?.riskLabel,
+    status: occurrence?.status,
+    city: occurrence?.city,
+    neighborhood: occurrence?.neighborhood,
+    citizenName: occurrence?.citizenName,
+    reportedAt: occurrence?.reportedAt,
+    time: occurrence?.time,
+    description: occurrence?.description,
+    lat: occurrence?.lat,
+    lng: occurrence?.lng,
+  }
+}
+
+function findOccurrenceByAiQuery(occurrences, detail = {}) {
+  const id = normalizeAiSearch(detail.id || detail.relatoId)
+  const query = normalizeAiSearch(detail.query || detail.title || detail.description)
+
+  if (id) {
+    const exact = occurrences.find((occurrence) => {
+      return [occurrence.id, occurrence.relatoId]
+        .filter(Boolean)
+        .some((value) => normalizeAiSearch(value) === id)
+    })
+    if (exact) return exact
+  }
+
+  if (!query) return occurrences[0] || null
+
+  return occurrences.find((occurrence) => {
+    const content = normalizeAiSearch([
+      occurrence.id,
+      occurrence.relatoId,
+      occurrence.title,
+      occurrence.type,
+      occurrence.city,
+      occurrence.neighborhood,
+      occurrence.citizenName,
+      occurrence.riskLabel,
+      occurrence.description,
+    ].filter(Boolean).join(' '))
+
+    return content.includes(query) || query.split(/\s+/).filter((part) => part.length >= 3).every((part) => content.includes(part))
+  }) || occurrences[0] || null
+}
+
 export default function Dashboard() {
   const [selectedOcc, setSelectedOcc] = useState(null)
   const [statusDraft, setStatusDraft] = useState('active')
@@ -185,6 +246,39 @@ export default function Dashboard() {
       handleOccClick(occurrence)
     }
   }
+
+  useEffect(() => {
+    window.__SMDN_AI_DASHBOARD = {
+      stats: dashboard.stats,
+      recentOccurrences: dashboard.recentOccurrences.map(occurrenceToAiContext),
+      victims: dashboard.victims,
+    }
+    window.dispatchEvent(new CustomEvent('smdn-ai-dashboard-context-updated', {
+      detail: window.__SMDN_AI_DASHBOARD,
+    }))
+  }, [dashboard])
+
+  useEffect(() => {
+    function handleAiOpenOccurrence(event) {
+      const detail = event?.detail || window.__SMDN_AI_PENDING_DASHBOARD_ACTION
+      if (!detail || dashboard.recentOccurrences.length === 0) return
+
+      const occurrence = findOccurrenceByAiQuery(dashboard.recentOccurrences, detail)
+      if (occurrence) {
+        setRecentMinimized(false)
+        handleOccClick(occurrence)
+      }
+
+      window.__SMDN_AI_PENDING_DASHBOARD_ACTION = null
+    }
+
+    window.addEventListener('smdn-ai-dashboard-open-occurrence', handleAiOpenOccurrence)
+    handleAiOpenOccurrence({ detail: window.__SMDN_AI_PENDING_DASHBOARD_ACTION })
+
+    return () => {
+      window.removeEventListener('smdn-ai-dashboard-open-occurrence', handleAiOpenOccurrence)
+    }
+  }, [dashboard.recentOccurrences])
 
   async function handleStatusUpdate() {
     if (!selectedOcc) return

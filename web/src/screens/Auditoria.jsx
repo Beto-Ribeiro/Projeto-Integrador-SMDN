@@ -30,6 +30,34 @@ function initials(name) {
     .toUpperCase()
 }
 
+
+function normalizeAiSearch(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function eventMatchesAiQuery(entry, query) {
+  const search = normalizeAiSearch(query)
+  if (!search) return false
+
+  const content = normalizeAiSearch([
+    entry?.action,
+    entry?.actionLabel,
+    entry?.actor?.name,
+    entry?.actor?.email,
+    entry?.target?.name,
+    entry?.target?.email,
+    entry?.detail,
+    entry?.role,
+    entry?.searchText,
+  ].filter(Boolean).join(' '))
+
+  return content.includes(search) || search.split(/\s+/).filter((part) => part.length >= 3).every((part) => content.includes(part))
+}
+
 function PersonBadge({ person, label }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
@@ -131,6 +159,50 @@ export default function Auditoria() {
     records: entries.filter((entry) => entry.type === 'record' || entry.type === 'profile').length,
     operators: users.length,
   }), [entries, users])
+
+  useEffect(() => {
+    window.__SMDN_AI_AUDIT = entries.slice(0, 80).map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      actionLabel: entry.actionLabel,
+      type: entry.type,
+      actor: entry.actor,
+      target: entry.target,
+      detail: entry.detail,
+      at: entry.at,
+      searchText: entry.searchText,
+    }))
+    window.dispatchEvent(new CustomEvent('smdn-ai-audit-context-updated', {
+      detail: { entries: window.__SMDN_AI_AUDIT },
+    }))
+  }, [entries])
+
+  useEffect(() => {
+    function handleAiAuditAction(event) {
+      const action = event?.detail || window.__SMDN_AI_PENDING_AUDIT_ACTION
+      if (!action || entries.length === 0) return
+
+      const query = action.query || ''
+      const type = action.type || action.filterType || ''
+
+      if (query) setSearch(query)
+      if (type && TYPE_CONFIG[type]) setFilterType(type)
+
+      if (action.openFirst !== false && query) {
+        const match = entries.find((entry) => eventMatchesAiQuery(entry, query))
+        if (match) setSelectedEntry(match)
+      }
+
+      window.__SMDN_AI_PENDING_AUDIT_ACTION = null
+    }
+
+    window.addEventListener('smdn-ai-audit-action', handleAiAuditAction)
+    handleAiAuditAction({ detail: window.__SMDN_AI_PENDING_AUDIT_ACTION })
+
+    return () => {
+      window.removeEventListener('smdn-ai-audit-action', handleAiAuditAction)
+    }
+  }, [entries])
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
