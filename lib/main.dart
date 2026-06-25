@@ -34,19 +34,28 @@ class TelaPerfil extends StatefulWidget {
 class _TelaPerfilState extends State<TelaPerfil> {
   final supabase = Supabase.instance.client;
 
-  final azul = const Color(0xFF1D3557);
-  final azulClaro = const Color(0xFF8FB3D9);
-
-  final double alturaCard = 90;
-
   final nome = TextEditingController();
   final cpf = TextEditingController();
-
   final alergias = TextEditingController();
   final observacoes = TextEditingController();
 
   String tipoUsuario = "";
   String tipoSanguineo = "O+";
+
+  bool menuAberto = false;
+  bool daltonismo = false;
+  bool letrasGrandes = false;
+  bool altoContraste = false;
+
+  Color get azul {
+    if (altoContraste) return Colors.yellow;
+    return daltonismo ? const Color(0xFF6A4C93) : const Color(0xFF1D3557);
+  }
+
+  Color get azulClaro {
+    if (altoContraste) return Colors.white;
+    return daltonismo ? const Color(0xFFF4A261) : const Color(0xFF8FB3D9);
+  }
 
   @override
   void initState() {
@@ -56,35 +65,19 @@ class _TelaPerfilState extends State<TelaPerfil> {
 
   Future<void> carregarDados() async {
     try {
-      // PERFIS
       final perfil = await supabase.from('Perfis').select().limit(1).single();
-
-      // CIDADAO
       final cidadao = await supabase.from('Cidadao').select().limit(1).single();
-
-      // HISTORICO
       final historico = await supabase
           .from('Historico_Medicacao_Cidadao')
           .select()
           .limit(1)
           .single();
 
-      print(perfil);
-      print(cidadao);
-      print(historico);
-
       setState(() {
-        // PERFIL
         nome.text = perfil['prf_nome'] ?? '';
-
-        // CIDADAO
         cpf.text = cidadao['cid_cpf'] ?? '';
-
-        // HISTORICO
         tipoSanguineo = historico['hmc_tipo_sanguineo'] ?? '';
-
         alergias.text = historico['hmc_alergias'] ?? '';
-
         observacoes.text = historico['hmc_doencas_cronicas'] ?? '';
       });
     } catch (e) {
@@ -94,70 +87,136 @@ class _TelaPerfilState extends State<TelaPerfil> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+    return MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(letrasGrandes ? 1.5 : 1.0)),
+      child: Scaffold(
+        backgroundColor: altoContraste ? Colors.black : const Color(0xFFF5F7FA),
 
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(18),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        topoIcone(Icons.arrow_back_ios_new),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              menuAberto = !menuAberto;
+                            });
+                          },
+                          child: topoIcone(Icons.settings),
+                        ),
+                      ],
+                    ),
 
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  topoIcone(Icons.arrow_back_ios_new),
-                  topoIcone(Icons.person),
-                ],
-              ),
+                    const SizedBox(height: 20),
 
-              const SizedBox(height: 20),
+                    Text(
+                      "Perfil do usuário",
+                      style: TextStyle(
+                        color: altoContraste
+                            ? Colors.white
+                            : Colors.grey.shade500,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
 
-              Text(
-                "Perfil do usuário",
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontStyle: FontStyle.italic,
+                    const SizedBox(height: 15),
+
+                    Container(
+                      width: 95,
+                      height: 95,
+                      decoration: BoxDecoration(
+                        color: altoContraste
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        size: 45,
+                        color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Text(
+                      nome.text,
+                      style: TextStyle(fontSize: 28, color: azul),
+                    ),
+
+                    Text(cpf.text, style: TextStyle(color: azulClaro)),
+
+                    const SizedBox(height: 20),
+
+                    campoBox("Tipo sanguíneo", tipoSanguineo),
+
+                    const SizedBox(height: 20),
+
+                    campoBox("Alergias", alergias.text),
+                    campoBox("Doenças", observacoes.text),
+                  ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 15),
-
-              Container(
-                width: 95,
-                height: 95,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(Icons.person, size: 45, color: Colors.white),
+            if (menuAberto)
+              GestureDetector(
+                onTap: () => setState(() => menuAberto = false),
+                child: Container(color: Colors.black45),
               ),
 
-              const SizedBox(height: 20),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              right: menuAberto ? 0 : -280,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 280,
+                color: altoContraste ? Colors.black : Colors.white,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 50),
+                    const Text(
+                      "Acessibilidade",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
 
-              campoTexto(nome, 28, true),
+                    SwitchListTile(
+                      title: const Text("Daltonismo"),
+                      value: daltonismo,
+                      onChanged: (v) => setState(() => daltonismo = v),
+                    ),
 
-              campoTexto(TextEditingController(text: tipoUsuario), 16, false),
+                    SwitchListTile(
+                      title: const Text("Letras grandes"),
+                      value: letrasGrandes,
+                      onChanged: (v) => setState(() => letrasGrandes = v),
+                    ),
 
-              campoTexto(cpf, 16, false),
-
-              const SizedBox(height: 20),
-
-              campoTipoSanguineo(),
-
-              const SizedBox(height: 30),
-
-              titulo("Alergias"),
-              areaTexto(alergias),
-
-              const SizedBox(height: 30),
-
-              titulo("Doenças"),
-              areaTexto(observacoes),
-
-              const SizedBox(height: 30),
-            ],
-          ),
+                    SwitchListTile(
+                      title: const Text("Alto contraste"),
+                      value: altoContraste,
+                      onChanged: (v) => setState(() => altoContraste = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -175,88 +234,24 @@ class _TelaPerfilState extends State<TelaPerfil> {
     );
   }
 
-  Widget campoTexto(
-    TextEditingController controller,
-    double tamanho,
-    bool destaque,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-
-      child: Text(
-        controller.text,
-        textAlign: TextAlign.center,
-
-        style: TextStyle(
-          fontSize: tamanho,
-          fontWeight: destaque ? FontWeight.bold : FontWeight.normal,
-          color: destaque ? azul : azulClaro,
-        ),
-      ),
-    );
-  }
-
-  Widget campoTipoSanguineo() {
-    return Container(
-      height: alturaCard,
-
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-
-      decoration: BoxDecoration(
-        border: Border.all(color: azulClaro),
-        borderRadius: BorderRadius.circular(12),
-      ),
-
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-
-        children: [
-          Text(
-            "Tipo sanguíneo",
-            style: TextStyle(fontSize: 12, color: azulClaro),
-          ),
-
-          const SizedBox(height: 4),
-
-          Text(
-            tipoSanguineo,
-
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: azul,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget titulo(String texto) {
-    return Text(
-      texto,
-
-      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: azul),
-    );
-  }
-
-  Widget areaTexto(TextEditingController controller) {
+  Widget campoBox(String titulo, String valor) {
     return Container(
       width: double.infinity,
-
       margin: const EdgeInsets.only(top: 10),
-
       padding: const EdgeInsets.all(12),
-
       decoration: BoxDecoration(
         border: Border.all(color: azulClaro),
         borderRadius: BorderRadius.circular(12),
       ),
-
-      child: Text(
-        controller.text.isEmpty ? "Nenhuma informação" : controller.text,
-
-        style: TextStyle(fontSize: 16, color: azul),
+      child: Column(
+        children: [
+          Text(titulo, style: TextStyle(color: azulClaro)),
+          const SizedBox(height: 5),
+          Text(
+            valor.isEmpty ? "Nenhuma informação" : valor,
+            style: TextStyle(color: azul),
+          ),
+        ],
       ),
     );
   }
