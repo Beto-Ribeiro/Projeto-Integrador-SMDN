@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import 'exportador_import.dart';
+import '../controles/botao_acessibilidade.dart';
+import '../controles/controle_acessibilidade.dart';
 
 class TelaPerfil extends StatefulWidget {
   final Function(int) onChangePage;
@@ -20,9 +23,12 @@ class TelaPerfil extends StatefulWidget {
 class _TelaPerfilState extends State<TelaPerfil> {
   final supabase = Supabase.instance.client;
 
-  final azul = const Color(0xFF1D3557);
-  final azulClaro = const Color(0xFF8FB3D9);
   final double alturaCard = 90;
+
+  // Atualizadas a cada build a partir do AccessibilityController,
+  // reagindo a alto contraste / daltonismo em toda a tela.
+  Color azul = const Color(0xFF1D3557);
+  Color azulClaro = const Color(0xFF8FB3D9);
 
   String nome = '';
   String cpf = '';
@@ -59,7 +65,9 @@ class _TelaPerfilState extends State<TelaPerfil> {
       print('=== USER ID: $userId ===');
       if (userId == null) {
         print('=== USUÁRIO NULO ===');
-        setState(() => carregando = false); // <-- não esquece de parar o loading
+        setState(
+          () => carregando = false,
+        ); // <-- não esquece de parar o loading
         return;
       }
 
@@ -123,7 +131,6 @@ class _TelaPerfilState extends State<TelaPerfil> {
       }
 
       setState(() => carregando = false);
-
     } catch (e) {
       print('=== ERRO GERAL: $e ===');
       setState(() => carregando = false);
@@ -132,89 +139,105 @@ class _TelaPerfilState extends State<TelaPerfil> {
 
   @override
   Widget build(BuildContext context) {
+    final acessibilidade = context.watch<AccessibilityController>();
+    azul = acessibilidade.corPrimaria;
+    azulClaro = acessibilidade.corSecundaria;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: acessibilidade.fundo,
       body: SafeArea(
-        child: carregando
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            children: [
-              // ── Botão voltar ──────────────────────────────────────
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton(
-                    onPressed: () => widget.onChangePage(0),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                      const Color.fromRGBO(228, 232, 235, 0.2),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back,
-                      size: 15,
-                      color: Color.fromRGBO(228, 232, 235, 1),
+        child: Stack(
+          children: [
+            // ── Conteúdo original da tela ───────────────────────────
+            carregando
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      children: [
+                        // ── Botão voltar ──────────────────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () => widget.onChangePage(0),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromRGBO(
+                                  228,
+                                  232,
+                                  235,
+                                  0.2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back,
+                                size: 15,
+                                color: Color.fromRGBO(228, 232, 235, 1),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── Label topo ────────────────────────────────────────
+                        Text(
+                          "Perfil do usuário",
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        // ── Avatar ────────────────────────────────────────────
+                        Container(
+                          width: 95,
+                          height: 95,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            size: 45,
+                            color: Colors.white,
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── Nome, tipo e CPF ──────────────────────────────────
+                        campoTexto(nome, 28, true),
+                        campoTexto(tipoUsuario, 16, false),
+                        campoTexto(cpf, 16, false),
+
+                        const SizedBox(height: 20),
+
+                        // ── Tipo sanguíneo ────────────────────────────────────
+                        campoTipoSanguineo(),
+
+                        const SizedBox(height: 30),
+
+                        // ── Alergias ──────────────────────────────────────────
+                        titulo("Alergias"),
+                        areaTexto(alergias),
+
+                        const SizedBox(height: 30),
+
+                        // ── Doenças ───────────────────────────────────────────
+                        titulo("Doenças"),
+                        areaTexto(observacoes),
+
+                        const SizedBox(height: 30),
+                      ],
                     ),
                   ),
-                ],
-              ),
 
-              const SizedBox(height: 20),
-
-              // ── Label topo ────────────────────────────────────────
-              Text(
-                "Perfil do usuário",
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              // ── Avatar ────────────────────────────────────────────
-              Container(
-                width: 95,
-                height: 95,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(
-                  Icons.person,
-                  size: 45,
-                  color: Colors.white,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── Nome, tipo e CPF ──────────────────────────────────
-              campoTexto(nome, 28, true),
-              campoTexto(tipoUsuario, 16, false),
-              campoTexto(cpf, 16, false),
-
-              const SizedBox(height: 20),
-
-              // ── Tipo sanguíneo ────────────────────────────────────
-              campoTipoSanguineo(),
-
-              const SizedBox(height: 30),
-
-              // ── Alergias ──────────────────────────────────────────
-              titulo("Alergias"),
-              areaTexto(alergias),
-
-              const SizedBox(height: 30),
-
-              // ── Doenças ───────────────────────────────────────────
-              titulo("Doenças"),
-              areaTexto(observacoes),
-
-              const SizedBox(height: 30),
-            ],
-          ),
+            // ── Botão de acessibilidade (canto superior direito) ─────
+            const BotaoAcessibilidade(),
+          ],
         ),
       ),
     );
