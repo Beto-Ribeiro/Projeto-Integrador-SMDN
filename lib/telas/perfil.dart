@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'exportador_import.dart';
 
 class TelaPerfil extends StatefulWidget {
   final Function(int) onChangePage;

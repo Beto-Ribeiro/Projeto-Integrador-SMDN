@@ -12,3 +12,4 @@ export 'cadastro_tela.dart';
 export 'sLogCad.dart';
 export 'confEmail.dart';
 export 'perfil.dart';
+export 'clima_tela.dart';

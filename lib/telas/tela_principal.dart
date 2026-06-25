@@ -46,11 +46,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
       Home(title: "SOS", onChangePage: changePage),                          // 0
       Maps_alertas(title: "SOS", onChangePage: changePage),                  // 1
       Relatos_tela(title: "Relato", onChangePage: changePage),               // 2
-      Scaffold(                                                               // 3
-        body: Center(
-          child: Text('Página: Clima', style: TextStyle(fontSize: 24)),
-        ),
-      ),
+      ClimaTela(),
       Cadastro_tela(                                                          // 4
         title: "Cadastro",
         onChangePage: changePage,
@@ -153,24 +149,17 @@ class CustomAnimatedBottomBar extends StatelessWidget {
     return SizedBox(
       height: 90,
       child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(
-          begin: currentIndex.toDouble(),
-          end: currentIndex.toDouble(),
-        ),
+        tween: Tween<double>(begin: currentIndex.toDouble(), end: currentIndex.toDouble()),
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOutBack,
         builder: (context, value, child) {
-          final double segmentWidth =
-              MediaQuery.of(context).size.width / icones.length;
-          final double buttonLeftOffset =
-              (segmentWidth * value) + (segmentWidth / 2) - 28;
+          final double segmentWidth = MediaQuery.of(context).size.width / icones.length;
+          final double buttonLeftOffset = (segmentWidth * value) + (segmentWidth / 2) - 28;
 
           return Stack(
             children: [
               Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
+                bottom: 0, left: 0, right: 0,
                 child: ClipPath(
                   clipper: MenuClipper(value, icones.length),
                   child: Container(
@@ -187,9 +176,7 @@ class CustomAnimatedBottomBar extends StatelessWidget {
                             height: 70,
                             child: Icon(
                               icones[index],
-                              color: currentIndex == index
-                                  ? Colors.transparent
-                                  : corIconeInativo,
+                              color: currentIndex == index ? Colors.transparent : corIconeInativo,
                               size: 28,
                             ),
                           ),
@@ -212,11 +199,7 @@ class CustomAnimatedBottomBar extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 3.5),
                     ),
-                    child: Icon(
-                      icones[currentIndex],
-                      color: Colors.white,
-                      size: 28,
-                    ),
+                    child: Icon(icones[currentIndex], color: Colors.white, size: 28),
                   ),
                 ),
               ),
@@ -244,8 +227,7 @@ class MenuClipper extends CustomClipper<Path> {
     final double height = size.height;
 
     final double segmentWidth = width / segments;
-    final double notchCenter =
-        (segmentWidth * position) + (segmentWidth / 2);
+    final double notchCenter = (segmentWidth * position) + (segmentWidth / 2);
 
     path.lineTo(notchCenter - 45, 0);
     path.cubicTo(notchCenter - 20, 0, notchCenter - 30, 45, notchCenter, 45);
