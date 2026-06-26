@@ -1,6 +1,12 @@
 import { listUsersForAdmin, PERMISSION_LABELS } from '../admin/userAdminService.js'
 import { getDashboardData } from '../dashboard/dashboardService.js'
 import { listAuditEvents } from '../auditoria/auditService.js'
+import { supabase } from '../supabase/client.js'
+import {
+  formatUserActivity,
+  getActivityDetails,
+  listUserActivities,
+} from '../perfil/profileActivityService.js'
 
 function normalizeText(value) {
   return String(value || '')
@@ -103,6 +109,39 @@ function compactAuditEvent(event) {
   }
 }
 
+function compactProfileActivity(activity, currentUser) {
+  const details = getActivityDetails(activity, currentUser)
+  const metadata = activity?.atu_metadata || {}
+
+  return {
+    id: activity?.atu_id || null,
+    action: activity?.atu_action || null,
+    summary: formatUserActivity(activity, currentUser),
+    detail: compactText(activity?.atu_detail, 700),
+    kind: metadata.kind || null,
+    createdAt: activity?.atu_created_at || null,
+    actor: {
+      id: activity?.atu_actor_id || null,
+      name:
+        activity?.actorProfile?.prf_nome ||
+        metadata?.actor?.name ||
+        metadata?.actorName ||
+        null,
+      email:
+        activity?.actorProfile?.prf_email_contato ||
+        metadata?.actor?.email ||
+        null,
+    },
+    sections: (details?.sections || []).map((section) => ({
+      title: section.title,
+      rows: (section.rows || []).map((row) => ({
+        label: row.label,
+        value: compactText(row.value, 500),
+      })),
+    })),
+  }
+}
+
 async function safeLoad(label, loader, fallback) {
   try {
     return await loader()
@@ -110,6 +149,12 @@ async function safeLoad(label, loader, fallback) {
     console.warn(`[SMDN IA] Não foi possível carregar contexto de ${label}:`, error?.message || error)
     return fallback
   }
+}
+
+async function getCurrentAuthUser() {
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw error
+  return data?.user || null
 }
 
 function findRelatedUsers(users, question) {
@@ -147,39 +192,238 @@ function buildUserSummary(users, question) {
   }
 }
 
-function buildDashboardSummary(dashboard) {
-  const recentOccurrences = (dashboard?.recentOccurrences || []).map(compactOccurrence)
-  const victims = (dashboard?.victims || []).map(compactVictim)
-  const recommended = [...recentOccurrences].sort((a, b) => {
-    const severityWeight = { critical: 4, severe: 3, regular: 2 }
-    const statusWeight = { active: 2, monitoring: 1, resolved: 0 }
-    const aw = (severityWeight[a.severity] || 1) * 10 + (statusWeight[a.status] || 0)
-    const bw = (severityWeight[b.severity] || 1) * 10 + (statusWeight[b.status] || 0)
-    if (bw !== aw) return bw - aw
-    return new Date(b.reportedAt || 0) - new Date(a.reportedAt || 0)
-  })[0] || null
+function getOccurrencePriorityScore(occurrence) {
+  const severityText = normalizeText([
+    occurrence?.severity,
+    occurrence?.riskLabel,
+    occurrence?.description,
+    occurrence?.title,
+    occurrence?.type,
+  ].filter(Boolean).join(' '))
+
+  let score = 0
+
+  if (severityText.includes('critico') || severityText.includes('crítico')) score += 50
+  if (severityText.includes('grave') || severityText.includes('severo') || severityText.includes('severe')) score += 35
+  if (severityText.includes('moderado') || severityText.includes('regular')) score += 15
+  if (normalizeText(occurrence?.status).includes('active') || normalizeText(occurrence?.status).includes('ativo')) score += 15
+  if (Number.isFinite(occurrence?.lat) && Number.isFinite(occurrence?.lng)) score += 8
+  if (occurrence?.photoUrl) score += 4
+  if (occurrence?.reportedAt) score += 4
+
+  return score
+}
+
+function pickRecommendedOccurrence(recentOccurrences = []) {
+  return [...recentOccurrences]
+    .sort((a, b) => {
+      const scoreDiff = getOccurrencePriorityScore(b) - getOccurrencePriorityScore(a)
+      if (scoreDiff !== 0) return scoreDiff
+      return new Date(b.reportedAt || 0) - new Date(a.reportedAt || 0)
+    })[0] || null
+}
+
+function buildDashboardPriority({ stats = {}, recentOccurrences = [], victims = [] }) {
+  const recommendedOccurrence = pickRecommendedOccurrence(recentOccurrences)
+  const checklist = []
+
+  if (stats.activeOccurrences > 0) {
+    checklist.push({
+      level: 'alta',
+      label: 'Ocorrências ativas',
+      reason: `Há ${stats.activeOccurrences} ocorrência(s) ativa(s). Verifique as mais recentes e críticas primeiro.`,
+    })
+  }
+
+  if (stats.criticalSeverity > 0) {
+    checklist.push({
+      level: 'crítica',
+      label: 'Severidade crítica',
+      reason: `Há ${stats.criticalSeverity} ponto(s) de severidade crítica no painel.`,
+    })
+  }
+
+  if (stats.locatedVictims > 0 || victims.length > 0) {
+    checklist.push({
+      level: 'crítica',
+      label: 'Vítimas localizadas',
+      reason: `Há ${stats.locatedVictims || victims.length} vítima(s) localizada(s). Priorize confirmação e atendimento.`,
+    })
+  }
+
+  if (stats.activeAlerts > 0) {
+    checklist.push({
+      level: 'atenção',
+      label: 'Alertas ativos',
+      reason: `Há ${stats.activeAlerts} alerta(s) ativo(s). Confira se precisam de atualização ou encerramento.`,
+    })
+  }
+
+  if (recommendedOccurrence) {
+    checklist.unshift({
+      level: 'crítica',
+      label: 'Ocorrência recomendada',
+      reason: `Confira primeiro ${recommendedOccurrence.title || recommendedOccurrence.id}, pois ela combina risco, status, recência e localização.`,
+      occurrenceId: recommendedOccurrence.id,
+      relatoId: recommendedOccurrence.relatoId,
+    })
+  }
 
   return {
-    stats: dashboard?.stats || {},
-    recentOccurrences,
-    victims,
-    recommendedOccurrence: recommended,
+    recommendedOccurrence,
+    checklist,
+    answerHint:
+      checklist.length > 0
+        ? 'Para responder "O que devo conferir primeiro?", use primeiro dashboard.priority.checklist. Se existir recommendedOccurrence, cite ela e explique por quê. Se não existir, use os cards stats.activeOccurrences, stats.criticalSeverity, stats.locatedVictims e stats.activeAlerts.'
+        : 'Se não houver ocorrências ou alertas, diga que o painel não indica prioridade crítica no momento.',
   }
 }
 
+function buildDashboardSummary(dashboard) {
+  const stats = dashboard?.stats || {}
+  const recentOccurrences = (dashboard?.recentOccurrences || []).map(compactOccurrence)
+  const victims = (dashboard?.victims || []).map(compactVictim)
+  const priority = buildDashboardPriority({ stats, recentOccurrences, victims })
+
+  return {
+    stats,
+    visibleCards: {
+      activeOccurrences: {
+        label: 'Ocorrências ativas',
+        value: Number(stats.activeOccurrences || 0),
+      },
+      activeAlerts: {
+        label: 'Alertas ativos',
+        value: Number(stats.activeAlerts || 0),
+      },
+      criticalSeverity: {
+        label: 'Severidade crítica',
+        value: Number(stats.criticalSeverity || 0),
+      },
+      resolvedToday: {
+        label: 'Resolvidas hoje',
+        value: Number(stats.resolvedToday || 0),
+      },
+      locatedVictims: {
+        label: 'Vítimas localizadas',
+        value: Number(stats.locatedVictims || 0),
+      },
+      assistedVictims: {
+        label: 'Vítimas atendidas',
+        value: Number(stats.assistedVictims || 0),
+      },
+    },
+    recentOccurrences,
+    victims,
+    recommendedOccurrence: priority.recommendedOccurrence,
+    priority,
+  }
+}
+
+function buildCurrentProfileSummary({ authUser, users, activities }) {
+  if (!authUser?.id) {
+    return {
+      user: null,
+      activities: {
+        total: 0,
+        recent: [],
+      },
+    }
+  }
+
+  const currentProfile = users.find((user) => user?.prf_id === authUser.id)
+  const compactProfile = currentProfile
+    ? compactUser(currentProfile)
+    : {
+        id: authUser.id,
+        name: authUser.email?.split('@')[0] || 'Usuário SMDN',
+        type: 'perfil autenticado',
+        email: authUser.email || null,
+        phone: null,
+        createdAt: authUser.created_at || null,
+        hasAvatar: false,
+        permissions: {},
+        rawPermissions: {},
+      }
+
+  const currentUserForFormat = {
+    id: authUser.id,
+    email: authUser.email,
+    name: compactProfile.name,
+    perfil: currentProfile || null,
+  }
+
+  const compactActivities = (activities || [])
+    .slice(0, 30)
+    .map((activity) => compactProfileActivity(activity, currentUserForFormat))
+
+  return {
+    user: compactProfile,
+    activities: {
+      total: activities?.length || 0,
+      recent: compactActivities,
+      howToRead:
+        'A lista de Atividade Recente mostra ações ligadas ao perfil atual, como login, alterações feitas por administrador, mudanças de permissões, e-mail, nome, ocorrências e alertas. Leia de cima para baixo: os primeiros itens são os mais recentes.',
+    },
+  }
+}
+
+function buildVisibleScreen(currentScreen) {
+  if (currentScreen === 'dashboard') {
+    return {
+      title: 'Dashboard',
+      visibleSections: [
+        'Mapa de calor',
+        'Pontos de ocorrência',
+        'Ocorrências recentes',
+        'Cards de métricas',
+        'Vítimas localizadas e atendidas',
+      ],
+      importantInstruction:
+        'Quando a pergunta for sobre o que conferir primeiro, use dashboard.priority.checklist e dashboard.visibleCards. Não responda que não encontrou prioridade se houver ocorrências ativas, severidade crítica, vítimas ou alertas ativos.',
+    }
+  }
+
+  if (currentScreen === 'perfil') {
+    return {
+      title: 'Perfil',
+      visibleSections: [
+        'Cartão do usuário',
+        'Permissões de acesso',
+        'Atividade Recente',
+        'Botões de acessibilidade e sair',
+      ],
+      importantInstruction:
+        'Quando a pergunta for sobre atividades recentes do Perfil, use currentProfile.activities.recent antes de dizer que não encontrou informação.',
+    }
+  }
+
+  return null
+}
+
 export async function buildSmdnOperationalContext({ question = '', currentScreen = '' } = {}) {
-  const [dashboard, usersResult, auditEvents] = await Promise.all([
+  const [dashboard, usersResult, auditEvents, authUser] = await Promise.all([
     safeLoad('dashboard', () => getDashboardData(), null),
     safeLoad('usuários', () => listUsersForAdmin(), { data: [] }),
     safeLoad('auditoria', () => listAuditEvents(), []),
+    safeLoad('usuário autenticado', () => getCurrentAuthUser(), null),
   ])
 
   const users = usersResult?.data || []
+  const profileActivities = authUser?.id
+    ? await safeLoad('atividades recentes do perfil', () => listUserActivities(authUser.id, 30), [])
+    : []
 
   return {
     generatedAt: new Date().toISOString(),
     currentScreen,
     question: compactText(question, 500),
+    visibleScreen: buildVisibleScreen(currentScreen),
+    currentProfile: buildCurrentProfileSummary({
+      authUser,
+      users,
+      activities: profileActivities,
+    }),
     dashboard: dashboard ? buildDashboardSummary(dashboard) : null,
     users: buildUserSummary(users, question),
     audit: {

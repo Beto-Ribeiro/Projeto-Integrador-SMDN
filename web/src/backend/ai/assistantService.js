@@ -14,20 +14,24 @@ const firebaseConfig = {
   appId: getEnv('VITE_FIREBASE_APP_ID'),
 }
 
-const AVAILABLE_ACTIONS = [
+const AVAILABLE_SCREENS = [
+  'dashboard',
+  'reportar',
+  'ocorrencias',
+  'relatorios',
+  'auditoria',
+  'perfil',
+  'admin',
+  'users',
+]
+
+const ALLOWED_ACTIONS = new Set([
   'navigate',
-  'fill',
-  'select',
-  'click',
-  'open_modal',
-  'focus',
-  'highlight',
-  'scroll_to',
   'open_user',
   'filter_users',
   'open_dashboard_occurrence',
   'filter_audit',
-]
+])
 
 function validateFirebaseConfig() {
   const missing = Object.entries(firebaseConfig)
@@ -44,7 +48,10 @@ function getFirebaseApp() {
 }
 
 function sanitizeText(value, maxLength = 4000) {
-  return String(value || '').trim().slice(0, maxLength)
+  return String(value || '')
+    .replace(/\u0000/g, '')
+    .trim()
+    .slice(0, maxLength)
 }
 
 function normalizeHistory(history = []) {
@@ -61,77 +68,74 @@ function normalizeHistory(history = []) {
     .join('\n')
 }
 
-function buildPrompt({
-  message,
-  currentScreen,
-  screenTitle,
-  screenIntro,
-  history,
-  operationalContext,
-  uiContext,
-}) {
+function safeStringify(value, maxLength = 19000) {
+  try {
+    return JSON.stringify(value || {}, null, 2).slice(0, maxLength)
+  } catch {
+    return '{}'
+  }
+}
+
+function buildPrompt({ message, currentScreen, screenTitle, screenIntro, history, operationalContext }) {
   const historyText = normalizeHistory(history)
 
   return [
-    'Você é a IA SMDN, assistente operacional avançado do Sistema de Monitoramento de Desastres Naturais.',
-    'Você deve agir como suporte geral do sistema: interpretar dados, explicar telas, navegar, preencher formulários, destacar elementos e ajudar em popups abertos.',
-    'Você recebe dois tipos de contexto: dados operacionais reais do SMDN e um retrato da interface visível no navegador.',
-    'Use os dados fornecidos. Não diga que não tem acesso se a informação existir no contexto operacional ou na interface.',
-    'Se a pergunta mencionar uma pessoa, usuário, administrador, cidadão, operador, auditoria, alerta, ocorrência, relatório ou campo visível, procure primeiro no contexto.',
-    'Quando existir popup/modal aberto, trate o popup como prioridade de contexto.',
-    'Você pode sugerir, preencher campos e clicar em botões seguros. Não confirme ações sensíveis sozinho, como disparar alerta, excluir, aprovar, rejeitar ou salvar mudanças críticas, a menos que o usuário peça explicitamente para confirmar.',
-    'Responda em português do Brasil, com clareza, objetividade e tom de suporte.',
-    'Use Markdown simples: **negrito**, listas com * item e quebras de linha.',
+    'Você é a IA SMDN, assistente operacional do Sistema de Monitoramento de Desastres Naturais.',
+    'Responda sempre em português do Brasil, com clareza, objetividade e tom profissional.',
+    'Use os dados reais recebidos no CONTEXTO_OPERACIONAL antes de dizer que não sabe.',
+    'Se um usuário, administrador, cidadão, instituição, ocorrência, auditoria, atividade recente, card do Dashboard ou prioridade existir no contexto, responda com base nele.',
+    'Não diga que não tem acesso se o dado estiver no contexto JSON.',
+    'Não invente dados fora do contexto. Se não encontrar, diga exatamente que não encontrou no contexto recebido.',
+    'Em emergência real, oriente seguir protocolos oficiais da Defesa Civil, Bombeiros, SAMU ou autoridade competente.',
+    'Nunca substitua a decisão técnica da autoridade responsável.',
     '',
     'FORMATO OBRIGATÓRIO DA RESPOSTA:',
-    'Retorne SOMENTE um JSON válido, sem markdown fora do JSON.',
-    'Estrutura:',
+    'Responda SOMENTE com JSON válido.',
+    'Não use bloco markdown.',
+    'Não coloque texto antes ou depois do JSON.',
+    'Não use aspas soltas sem escape dentro do campo answer.',
+    'Use \\n dentro da string answer quando precisar quebrar linhas.',
+    'Formato exato:',
     '{',
-    '  "answer": "texto em markdown simples para mostrar ao usuário",',
-    '  "actions": [',
-    '    { "type": "navigate", "screen": "dashboard|reportar|ocorrencias|relatorios|auditoria|perfil|admin|users" },',
-    '    { "type": "fill", "target": "label/placeholder/aiId do campo", "value": "texto para preencher" },',
-    '    { "type": "select", "target": "label/placeholder/aiId do select", "value": "opção" },',
-    '    { "type": "click", "target": "texto/aiId do botão", "confirm": false },',
-    '    { "type": "open_modal", "target": "texto/aiId do botão" },',
-    '    { "type": "highlight", "target": "texto/aiId do elemento" }',
-    '  ]',
+    '  "answer": "texto em Markdown simples para exibir no chat",',
+    '  "actions": []',
     '}',
     '',
-    'Ações permitidas:',
-    AVAILABLE_ACTIONS.join(', '),
+    'Ações permitidas em actions:',
+    '- {"type":"navigate","screen":"dashboard|reportar|ocorrencias|relatorios|auditoria|perfil|admin|users"}',
+    '- {"type":"open_user","query":"nome, e-mail ou id do usuário"}',
+    '- {"type":"filter_users","query":"texto para filtrar a lista de usuários"}',
+    '- {"type":"open_dashboard_occurrence","id":"id ou relatoId da ocorrência","query":"texto de busca opcional"}',
+    '- {"type":"filter_audit","query":"texto para pesquisar na auditoria","openFirst":true}',
     '',
-    'Exemplos:',
-    'Usuário: "me leve ao dashboard"',
-    '{"answer":"Pronto, te levei para **Dashboard**.","actions":[{"type":"navigate","screen":"dashboard"}]}',
+    'REGRAS IMPORTANTES:',
+    '- Perguntas como "Quem é Giovanna?" ou "Quem é Ales Lino?": procure em CONTEXTO_OPERACIONAL.users.profiles e, se encontrar, responda tipo, contato, permissões e inclua action open_user.',
+    '- Perguntas como "Quem são os administradores?": use CONTEXTO_OPERACIONAL.users.admins, liste os nomes e inclua action filter_users com query "administrador".',
+    '- Perguntas como "Tem instituição?": use CONTEXTO_OPERACIONAL.users.institutions e diga se há ou não há perfis de instituição.',
+    '- Perguntas sobre mudanças de perfil, logs ou auditoria: use CONTEXTO_OPERACIONAL.audit.recentEvents e inclua action filter_audit quando fizer sentido.',
+    '- Perguntas sobre a tela Perfil, permissões ou atividades recentes: use CONTEXTO_OPERACIONAL.currentProfile.user e CONTEXTO_OPERACIONAL.currentProfile.activities.recent.',
+    '- Se a pergunta for "Como interpretar atividades recentes?", explique a lista visível do Perfil usando currentProfile.activities.howToRead e cite exemplos de currentProfile.activities.recent.',
+    '- Perguntas como "O que devo conferir primeiro?" no Dashboard: use CONTEXTO_OPERACIONAL.dashboard.priority.checklist, dashboard.recommendedOccurrence e dashboard.visibleCards.',
+    '- Se dashboard.recommendedOccurrence estiver vazio, mas houver dashboard.visibleCards com ocorrências ativas, severidade crítica, vítimas ou alertas, use esses cards como prioridade. Não responda que não encontrou prioridade.',
+    '- Se houver vítimas localizadas, severidade crítica ou ocorrências ativas, destaque isso como prioridade imediata.',
+    '- Use Markdown simples dentro do campo answer: **negrito**, quebras de linha e listas com * item.',
     '',
-    'Usuário: "escreve um alerta de enchente crítica em Roseira"',
-    '{"answer":"Preenchi um rascunho de alerta. Revise antes de confirmar o disparo.","actions":[{"type":"select","target":"Tipo de ocorrência","value":"Enchente"},{"type":"select","target":"Severidade","value":"Crítico"},{"type":"fill","target":"Município","value":"Roseira"},{"type":"fill","target":"Descrição","value":"Alerta de enchente crítica em Roseira. Evite áreas alagadas, busque locais seguros e acompanhe orientações da Defesa Civil."}]}',
-    '',
+    `Telas disponíveis: ${AVAILABLE_SCREENS.join(', ')}.`,
     `Tela atual: ${sanitizeText(screenTitle || currentScreen || 'SMDN', 120)}`,
-    screenIntro ? `Contexto da tela: ${sanitizeText(screenIntro, 500)}` : '',
+    screenIntro ? `Contexto da tela atual: ${sanitizeText(screenIntro, 800)}` : '',
     historyText ? `Histórico recente:\n${historyText}` : '',
-    operationalContext ? `DADOS OPERACIONAIS REAIS DO SMDN:\n${JSON.stringify(operationalContext).slice(0, 22000)}` : '',
-    uiContext ? `INTERFACE VISÍVEL NO NAVEGADOR:\n${JSON.stringify(uiContext).slice(0, 22000)}` : '',
     `Pergunta do usuário:\n${sanitizeText(message, 2500)}`,
+    '',
+    `CONTEXTO_OPERACIONAL:\n${safeStringify(operationalContext)}`,
   ]
     .filter(Boolean)
     .join('\n\n')
 }
 
 function extractText(result) {
-  if (typeof result?.response?.text === 'function') {
-    return result.response.text()
-  }
-
-  if (typeof result?.text === 'function') {
-    return result.text()
-  }
-
-  if (typeof result?.text === 'string') {
-    return result.text
-  }
-
+  if (typeof result?.response?.text === 'function') return result.response.text()
+  if (typeof result?.text === 'function') return result.text()
+  if (typeof result?.text === 'string') return result.text
   return ''
 }
 
@@ -160,9 +164,15 @@ function createGenerativeModel() {
 
   const model = getGenerativeModel(ai, {
     model: modelName,
+    generationConfig: {
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 1000,
+      responseMimeType: 'application/json',
+    },
   })
 
-  console.log('🔥 SMDN IA — MODO OPERADOR COM VERTEX AI 🔥', {
+  console.log('🔥 SMDN IA — DASHBOARD PRIORITÁRIO + RESPOSTA JSON ESTÁVEL 🔥', {
     projectId: firebaseConfig.projectId,
     appId: firebaseConfig.appId,
     location,
@@ -172,54 +182,174 @@ function createGenerativeModel() {
   return { model, modelName }
 }
 
-function extractJsonObject(text) {
-  const raw = String(text || '').trim()
-
-  try {
-    return JSON.parse(raw)
-  } catch {
-    // continua
-  }
-
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fenced?.[1]) {
-    try {
-      return JSON.parse(fenced[1].trim())
-    } catch {
-      // continua
-    }
-  }
-
-  const start = raw.indexOf('{')
-  const end = raw.lastIndexOf('}')
-
-  if (start >= 0 && end > start) {
-    try {
-      return JSON.parse(raw.slice(start, end + 1))
-    } catch {
-      // continua
-    }
-  }
-
-  return {
-    answer: raw,
-    actions: [],
-  }
+function stripMarkdownFence(text) {
+  return String(text || '')
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
 }
 
-function normalizeAiResponse(text) {
-  const parsed = extractJsonObject(text)
+function findBalancedJsonObject(text) {
+  const source = String(text || '')
+  const start = source.indexOf('{')
+  if (start < 0) return ''
 
-  if (typeof parsed === 'string') {
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+
+    if (char === '\\') {
+      escaped = true
+      continue
+    }
+
+    if (char === '"') {
+      inString = !inString
+      continue
+    }
+
+    if (inString) continue
+
+    if (char === '{') depth += 1
+    if (char === '}') depth -= 1
+
+    if (depth === 0) return source.slice(start, index + 1)
+  }
+
+  return ''
+}
+
+function normalizeVisibleAnswer(value) {
+  let text = ''
+
+  if (typeof value === 'string') {
+    text = value
+  } else if (value && typeof value === 'object') {
+    text = value.answer || value.text || ''
+  }
+
+  text = String(text || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{4,}/g, '\n\n\n')
+    .replace(/^["']|["']$/g, '')
+    .trim()
+
+  if (!text || text === '[object Object]' || text === 'undefined' || text === 'null') {
+    return 'Não consegui gerar uma resposta clara agora. Tente reformular a pergunta.'
+  }
+
+  if (text.startsWith('{') && text.includes('"answer"')) {
+    return 'A IA retornou uma resposta fora do formato esperado. Tente enviar a pergunta novamente.'
+  }
+
+  return text.slice(0, 3500)
+}
+
+function normalizeActions(actions) {
+  if (!Array.isArray(actions)) return []
+
+  return actions
+    .map((action) => {
+      if (!action || typeof action !== 'object') return null
+
+      const type = String(action.type || '').trim().toLowerCase()
+      if (!ALLOWED_ACTIONS.has(type)) return null
+
+      if (type === 'navigate') {
+        const screen = String(action.screen || '').trim()
+        return AVAILABLE_SCREENS.includes(screen) ? { type, screen } : null
+      }
+
+      if (type === 'open_user') {
+        return { type, query: sanitizeText(action.query || action.name || action.id, 180) }
+      }
+
+      if (type === 'filter_users') {
+        return { type, query: sanitizeText(action.query || action.role || action.kind || action.type, 180) }
+      }
+
+      if (type === 'open_dashboard_occurrence') {
+        return {
+          type,
+          id: sanitizeText(action.id || action.relatoId, 120),
+          query: sanitizeText(action.query || action.title, 180),
+        }
+      }
+
+      if (type === 'filter_audit') {
+        return {
+          type,
+          query: sanitizeText(action.query, 180),
+          auditType: sanitizeText(action.auditType || action.kind || action.filterType, 120),
+          openFirst: action.openFirst !== false,
+        }
+      }
+
+      return null
+    })
+    .filter(Boolean)
+}
+
+function parseJsonPayload(text) {
+  const cleaned = stripMarkdownFence(text)
+
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    // tenta extrair objeto balanceado
+  }
+
+  const balanced = findBalancedJsonObject(cleaned)
+
+  if (balanced) {
+    try {
+      return JSON.parse(balanced)
+    } catch {
+      // fallback abaixo
+    }
+  }
+
+  return null
+}
+
+function extractLooseAnswer(text) {
+  const cleaned = stripMarkdownFence(text)
+  const answerMatch = cleaned.match(/["']answer["']\s*:\s*["']([\s\S]*?)["']\s*,\s*["']actions["']/i)
+
+  if (answerMatch?.[1]) {
+    return answerMatch[1]
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .trim()
+  }
+
+  if (cleaned.includes('"answer"')) return ''
+  return cleaned
+}
+
+function parseAssistantPayload(rawText) {
+  const parsed = parseJsonPayload(rawText)
+
+  if (parsed && typeof parsed === 'object') {
     return {
-      text: parsed,
-      actions: [],
+      text: normalizeVisibleAnswer(parsed.answer || parsed.text),
+      actions: normalizeActions(parsed.actions),
     }
   }
 
   return {
-    text: parsed.answer || parsed.text || text || 'Não consegui gerar uma resposta agora.',
-    actions: Array.isArray(parsed.actions) ? parsed.actions : [],
+    text: normalizeVisibleAnswer(extractLooseAnswer(rawText)),
+    actions: [],
   }
 }
 
@@ -230,9 +360,8 @@ export async function askSmdnAssistant({
   screenIntro,
   history,
   operationalContext,
-  uiContext,
 }) {
-  console.log('🔥 ASSISTANT SERVICE RODANDO — MODO OPERADOR SMDN 🔥')
+  console.log('🔥 ASSISTANT SERVICE RODANDO — DASHBOARD COM PRIORIDADE REAL 🔥')
 
   const cleanMessage = sanitizeText(message, 2500)
 
@@ -251,18 +380,16 @@ export async function askSmdnAssistant({
         screenIntro,
         history,
         operationalContext,
-        uiContext,
       })
     )
 
     const rawText = extractText(result)
-    const normalized = normalizeAiResponse(rawText)
+    const parsed = parseAssistantPayload(rawText)
 
     return {
-      text: normalized.text || 'Não consegui gerar uma resposta agora.',
-      actions: normalized.actions,
+      text: parsed.text || 'Não consegui gerar uma resposta clara agora. Tente reformular a pergunta.',
+      actions: parsed.actions,
       model: modelName,
-      raw: rawText,
     }
   } catch (error) {
     console.error('[SMDN IA] Erro Vertex AI Firebase:', error)
