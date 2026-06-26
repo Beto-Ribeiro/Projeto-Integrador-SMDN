@@ -21,8 +21,8 @@ class _TelaPrincipalState extends State<TelaPrincipal>
 
   bool estalogado = false;
 
-  int _currentIndex = 0; // TEMPORÁRIO: Bypass de login
-  // Supabase.instance.client.auth.currentUser == null ? 5 : 0;
+  late int _currentIndex;
+
 
   String? emailCadastro;
   String? senhaCadastro;
@@ -42,6 +42,8 @@ class _TelaPrincipalState extends State<TelaPrincipal>
   @override
   void initState() {
     super.initState();
+    _currentIndex = Supabase.instance.client.auth.currentUser == null ? 5 : 0;
+
     // Animação do botão Nimbo
     _nimboAnimController = AnimationController(
       vsync: this,
