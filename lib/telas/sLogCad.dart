@@ -90,17 +90,12 @@ class _sLogCad_telaState extends State<sLogCad> {
                       ],
                     ),
                   ),
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(
-                      0,
-                      80,
-                      0,
-                      500,
-                    ),
-
-                    child: Image.asset(
-                      "gfx/png/Image/SMDN.png",
-                      height: 60,
+                  Expanded(
+                    child: Center(
+                      child: Image.asset(
+                        "gfx/png/Image/SMDN.png",
+                        height: 60,
+                      ),
                     ),
                   ),
                 ],

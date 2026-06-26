@@ -26,12 +26,24 @@ class confEmail extends StatefulWidget {
 }
 
 class _confEmail_state extends State<confEmail> {
+  bool _verificando = false;
 
   Future<void> verificarConfirmacao() async {
     print("Clicou em Já confirmei");
     print("EMAIL: ${widget.email}");
     print("SENHA: ${widget.senha}");
-    if (widget.email == null || widget.senha == null) return;
+    if (widget.email == null || widget.senha == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Erro: e-mail ou senha não foram recebidos. Tente cadastrar novamente."),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _verificando = true;
+    });
 
     try {
       final response = await Supabase.instance.client.auth.signInWithPassword(
@@ -41,13 +53,42 @@ class _confEmail_state extends State<confEmail> {
 
       if (response.session != null) {
         widget.onChangePage(0);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Não foi possível iniciar a sessão. Tente novamente."),
+          ),
+        );
       }
-    } catch (e) {
+    } on AuthException catch (e) {
+      print("AuthException: ${e.message} | statusCode: ${e.statusCode}");
+      String mensagem;
+      // Supabase returns "Email not confirmed" when email is unverified
+      if (e.message.toLowerCase().contains('email not confirmed') ||
+          e.message.toLowerCase().contains('email não confirmado')) {
+        mensagem = "E-mail ainda não confirmado. Verifique sua caixa de entrada e spam.";
+      } else if (e.message.toLowerCase().contains('invalid login credentials') ||
+          e.message.toLowerCase().contains('invalid')) {
+        mensagem = "Credenciais inválidas. Tente cadastrar novamente.";
+      } else {
+        mensagem = "Erro: ${e.message}";
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("E-mail ainda não confirmado."),
+        SnackBar(content: Text(mensagem)),
+      );
+    } catch (e) {
+      print("Erro genérico: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Erro inesperado: $e"),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _verificando = false;
+        });
+      }
     }
   }
 
@@ -112,7 +153,31 @@ class _confEmail_state extends State<confEmail> {
                           height: 30,
                           width: double.infinity,
                         ),
-                        ElevatedButton(onPressed: verificarConfirmacao, child: Text("Já confirmei!"))
+                        ElevatedButton(
+                          onPressed: _verificando ? null : verificarConfirmacao,
+                          child: _verificando
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text("Já confirmei!"),
+                        ),
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: () {
+                            widget.onChangePage(7); // Ir para tela de login
+                          },
+                          child: const Text(
+                            "Ir para Login",
+                            style: TextStyle(
+                              fontStyle: FontStyle.italic,
+                              fontSize: 13,
+                              color: Colors.blueGrey,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),

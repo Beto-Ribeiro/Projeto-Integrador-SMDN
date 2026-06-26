@@ -1,5 +1,6 @@
 import 'package:branch1/telas/Relatos.dart';
 import 'package:branch1/telas/login_tela.dart';
+import 'package:branch1/services/chatbot_service.dart';
 import 'package:flutter/material.dart';
 import 'exportador_import.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -13,17 +14,22 @@ class TelaPrincipal extends StatefulWidget {
   State<TelaPrincipal> createState() => _TelaPrincipalState();
 }
 
-class _TelaPrincipalState extends State<TelaPrincipal> {
+class _TelaPrincipalState extends State<TelaPrincipal>
+    with SingleTickerProviderStateMixin {
   // ── Variáveis de estado ───────────────────────────────────────────────────
   late List<Widget> _telas;
 
   bool estalogado = false;
 
-  int _currentIndex =
-  Supabase.instance.client.auth.currentUser == null ? 5 : 0;
+  int _currentIndex = 0; // TEMPORÁRIO: Bypass de login
+  // Supabase.instance.client.auth.currentUser == null ? 5 : 0;
 
   String? emailCadastro;
   String? senhaCadastro;
+
+  // ── Animação do botão Nimbo ───────────────────────────────────────────────
+  late final AnimationController _nimboAnimController;
+  late final Animation<double> _nimboScaleAnim;
 
   final List<IconData> _icones = [
     Icons.warning_amber_rounded,
@@ -36,8 +42,23 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   @override
   void initState() {
     super.initState();
+    // Animação do botão Nimbo
+    _nimboAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.88,
+      upperBound: 1.0,
+    )..value = 1.0;
+    _nimboScaleAnim = _nimboAnimController;
+
     _Ask_for_permission();
     _inicializarTelas(); // cria as telas UMA VEZ SÓ
+  }
+
+  @override
+  void dispose() {
+    _nimboAnimController.dispose();
+    super.dispose();
   }
 
   // ── Inicializa a lista de telas ───────────────────────────────────────────
@@ -46,7 +67,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
       Home(title: "SOS", onChangePage: changePage),                          // 0
       Maps_alertas(title: "SOS", onChangePage: changePage),                  // 1
       Relatos_tela(title: "Relato", onChangePage: changePage),               // 2
-      ClimaTela(),
+      ClimaTela(),                                                            // 3
       Cadastro_tela(                                                          // 4
         title: "Cadastro",
         onChangePage: changePage,
@@ -75,7 +96,8 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
         senha: senhaCadastro,
       ),
       sLogin(title: "Login", onChangePage: changePage),                      // 7
-      TelaPerfil(title: "Perfil", onChangePage: changePage)
+      TelaPerfil(title: "Perfil", onChangePage: changePage),                 // 8
+      ChatbotTela(title: 'Nimbo', onChangePage: changePage),                 // 9 — IA Chatbot
     ];
   }
 
@@ -97,31 +119,91 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     });
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    // Telas que ocultam nav bar E o botão Nimbo
+    final bool ocultarNav = (
+      _currentIndex == 4 ||
+      _currentIndex == 5 ||
+      _currentIndex == 6 ||
+      _currentIndex == 7 ||
+      _currentIndex == 8
+    );
+    final bool noNimbo = _currentIndex == 9; // já está no chatbot
+
     return Scaffold(
       extendBody: true,
-      // IndexedStack mantém todas as telas vivas, só troca qual aparece
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _telas,
+      body: Stack(
+        children: [
+          // ── Conteúdo principal ────────────────────────────────────────────
+          IndexedStack(
+            index: _currentIndex,
+            children: _telas,
+          ),
+
+          // ── Botão flutuante Nimbo ─────────────────────────────────────────
+          // Aparece apenas nas telas com nav bar e quando não estamos no chatbot
+          if (!ocultarNav && !noNimbo)
+            Positioned(
+              bottom: 80, // logo acima da nav bar (altura 70)
+              right: 20,
+              child: ScaleTransition(
+                scale: _nimboScaleAnim,
+                child: GestureDetector(
+                  onTapDown: (_) => _nimboAnimController.reverse(),
+                  onTapUp: (_) {
+                    _nimboAnimController.forward();
+                    setState(() => _currentIndex = 9);
+                  },
+                  onTapCancel: () => _nimboAnimController.forward(),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B1426),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(32),
+                        topRight: Radius.circular(32),
+                        bottomLeft: Radius.circular(32),
+                        bottomRight: Radius.circular(4),
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.15),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Image.asset(
+                        'gfx/png/Image/nimbo_icon.png',
+                        fit: BoxFit.contain,
+                        isAntiAlias: true,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
-      bottomNavigationBar:
-      (_currentIndex == 4 ||
-          _currentIndex == 5 ||
-          _currentIndex == 6 ||
-          _currentIndex == 7 || _currentIndex == 8)
+      bottomNavigationBar: ocultarNav || noNimbo
           ? null
           : CustomAnimatedBottomBar(
-        currentIndex: _currentIndex,
-        icones: _icones,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-      ),
+              currentIndex: _currentIndex,
+              icones: _icones,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
     );
   }
 }
