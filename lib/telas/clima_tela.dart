@@ -22,8 +22,10 @@ class _ClimaTelaState extends State<ClimaTela> {
   final String apiKey = "b5ead541b23bfa3331c7cf3de0678295";
 
   Future<void> buscarClima() async {
+    if (cidade.trim().isEmpty) return;
+
     final url =
-        "https://api.openweathermap.org/data/2.5/weather?q=$cidade&appid=$apiKey&units=metric&lang=pt_br";
+        "https://api.openweathermap.org/data/2.5/weather?q=${Uri.encodeComponent(cidade)}&appid=$apiKey&units=metric&lang=pt_br";
 
     final response = await http.get(Uri.parse(url));
 
@@ -46,48 +48,60 @@ class _ClimaTelaState extends State<ClimaTela> {
   }
 
   Future<void> buscarClimaPorLocalizacao() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    try {
+      bool serviceEnabled;
+      LocationPermission permission;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _mostrarErro("Serviço de localização desativado");
         return;
       }
-    }
-    
-    if (permission == LocationPermission.deniedForever) {
-      return;
-    }
 
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    
-    final url = "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$apiKey&units=metric&lang=pt_br";
-    
-    final response = await http.get(Uri.parse(url));
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _mostrarErro("Permissão de localização negada");
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        _mostrarErro("Permissão permanentemente negada");
+        return;
+      }
 
-    if (response.statusCode == 200) {
-      final dados = jsonDecode(response.body);
-      setState(() {
-        cidade = dados["name"];
-        temperatura = "${dados["main"]["temp"].round()}°";
-        descricao = dados["weather"][0]["description"];
-        buscouClima = true;
-        cidadeController.text = cidade;
-      });
-    } else {
-      setState(() {
-        temperatura = "--°";
-        descricao = "Erro ao buscar local";
-        buscouClima = true;
-      });
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      
+      final url = "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$apiKey&units=metric&lang=pt_br";
+      
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final dados = jsonDecode(response.body);
+        setState(() {
+          cidade = dados["name"];
+          temperatura = "${dados["main"]["temp"].round()}°";
+          descricao = dados["weather"][0]["description"];
+          buscouClima = true;
+          cidadeController.text = cidade;
+        });
+      } else {
+        _mostrarErro("Erro ao buscar clima da localização");
+      }
+    } catch (e) {
+      _mostrarErro("Erro ao obter a localização");
     }
+  }
+
+  void _mostrarErro(String mensagem) {
+    setState(() {
+      cidade = "";
+      temperatura = "--°";
+      descricao = mensagem;
+      buscouClima = true;
+    });
   }
 
   @override
