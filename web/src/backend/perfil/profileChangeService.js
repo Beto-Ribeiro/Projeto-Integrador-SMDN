@@ -1,0 +1,170 @@
+import { supabase } from '../supabase/client.js'
+import { formatBrazilPhone } from '../../utils/phone.js'
+
+function normalize(value) {
+  return String(value ?? '').trim()
+}
+
+export function buildProfileChanges({ currentUser, form, requestPasswordReset = false }) {
+  const currentProfile = currentUser?.perfil || {}
+  const changes = {}
+
+  const currentName = normalize(currentUser?.name || currentProfile.prf_nome)
+  const nextName = normalize(form.name)
+  if (nextName && nextName !== currentName) {
+    changes.name = { label: 'Nome completo', old: currentName || '—', new: nextName }
+  }
+
+  const currentPhone = formatBrazilPhone(currentProfile.prf_telefone || form.currentPhone || '')
+  const nextPhone = formatBrazilPhone(form.phone)
+  if (nextPhone !== currentPhone) {
+    changes.phone = { label: 'Telefone', old: currentPhone || '—', new: nextPhone || '—' }
+  }
+
+  const currentContactEmail = normalize(currentProfile.prf_email_contato || currentUser?.email)
+  const nextContactEmail = normalize(form.email).toLowerCase()
+  if (nextContactEmail && nextContactEmail !== currentContactEmail.toLowerCase()) {
+    changes.email = { label: 'E-mail de contato', old: currentContactEmail || '—', new: nextContactEmail }
+  }
+
+  const currentAvatarUrl = normalize(currentProfile.prf_avatar_url || currentUser?.avatar || '')
+  const nextAvatarUrl = normalize(form.avatarUrl || '')
+  if (nextAvatarUrl !== currentAvatarUrl) {
+    changes.avatar = {
+      label: 'Foto do perfil',
+      old: currentAvatarUrl ? 'Foto atual' : '—',
+      new: nextAvatarUrl ? 'Nova foto enviada' : '—',
+      value: nextAvatarUrl || null,
+    }
+  }
+
+  if (requestPasswordReset) {
+    changes.password = {
+      label: 'Senha',
+      old: '—',
+      new: 'Solicita redefinição de senha',
+      manualOnly: true,
+    }
+  }
+
+  return changes
+}
+
+export function hasProfileChanges(changes) {
+  return Object.keys(changes || {}).length > 0
+}
+
+
+function changesToActivityList(changes) {
+  return Object.entries(changes || {}).map(([key, change]) => ({
+    key,
+    label: change.label,
+    oldValue: change.old,
+    newValue: change.value ?? change.new,
+  }))
+}
+
+function isMissingRelationError(error) {
+  return error?.code === '42P01' || String(error?.message || '').toLowerCase().includes('does not exist')
+}
+
+async function safeInsertActivity(payload) {
+  const { error } = await supabase.from('Atividade_Usuario').insert(payload)
+  if (error && !isMissingRelationError(error)) {
+    console.warn('Não foi possível registrar atividade do perfil:', error.message)
+  }
+}
+
+export async function requestProfileChange({ currentUser, form, requestPasswordReset = false }) {
+  if (!currentUser?.id) throw new Error('Usuário inválido para solicitar alteração.')
+
+  const changes = buildProfileChanges({ currentUser, form, requestPasswordReset })
+
+  if (!hasProfileChanges(changes)) {
+    throw new Error('Nenhuma alteração foi informada.')
+  }
+
+  const { data, error } = await supabase
+    .from('Solicitacao_Alteracao_Perfil')
+    .insert({
+      sap_user_id: currentUser.id,
+      sap_nome_solicitante: currentUser.name || currentUser.email,
+      sap_email_solicitante: currentUser.email,
+      sap_alteracoes: changes,
+      sap_status: 'pendente',
+    })
+    .select('*')
+    .single()
+
+  if (error) {
+    if (error.code === '42P01' || String(error.message || '').toLowerCase().includes('does not exist')) {
+      throw new Error('A solicitação de alteração de perfil ainda não está disponível. Avise o responsável pelo painel.')
+    }
+    throw error
+  }
+
+  return data
+}
+
+export async function updateOwnProfileDirect({ currentUser, form, newPassword = '' }) {
+  if (!currentUser?.id) throw new Error('Usuário inválido para atualizar perfil.')
+
+  const payload = {
+    prf_nome: normalize(form.name),
+    prf_telefone: formatBrazilPhone(form.phone) || null,
+    prf_email_contato: normalize(form.email).toLowerCase() || null,
+    prf_avatar_url: normalize(form.avatarUrl) || null,
+  }
+
+  const { data, error } = await supabase
+    .from('Perfis')
+    .update(payload)
+    .eq('prf_id', currentUser.id)
+    .select('prf_id, prf_nome, prf_tipo, prf_telefone, prf_email_contato, prf_avatar_url, prf_permissoes, prf_created_at')
+    .single()
+
+  if (error) throw error
+
+  const nextEmail = normalize(payload.prf_email_contato).toLowerCase()
+  const currentAuthEmail = normalize(currentUser.email).toLowerCase()
+  if (nextEmail && nextEmail !== currentAuthEmail) {
+    const { error: authEmailError } = await supabase.rpc('admin_update_auth_email', {
+      p_user_id: currentUser.id,
+      p_new_email: nextEmail,
+    })
+
+    if (authEmailError) {
+      throw new Error('Perfil salvo, mas não foi possível alterar o e-mail de entrada. Tente novamente ou avise o responsável pelo painel.')
+    }
+  }
+
+  const changes = buildProfileChanges({ currentUser, form })
+  const activityChanges = changesToActivityList(changes)
+
+  if (activityChanges.length > 0) {
+    await safeInsertActivity({
+      atu_user_id: currentUser.id,
+      atu_actor_id: currentUser.id,
+      atu_action: 'Perfil alterado pelo próprio usuário',
+      atu_detail: 'Usuário alterou o próprio perfil.',
+      atu_metadata: {
+        actorName: currentUser.name || currentUser.email || 'Usuário',
+        actorIsTarget: true,
+        targetName: data.prf_nome,
+        changes: activityChanges,
+      },
+    })
+  }
+
+  const cleanPassword = String(newPassword || '')
+  if (cleanPassword.length > 0) {
+    if (cleanPassword.length < 6) {
+      throw new Error('A nova senha precisa ter pelo menos 6 caracteres.')
+    }
+
+    const { error: passwordError } = await supabase.auth.updateUser({ password: cleanPassword })
+    if (passwordError) throw passwordError
+  }
+
+  return data
+}

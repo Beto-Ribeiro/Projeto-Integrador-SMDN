@@ -1,7 +1,11 @@
 import 'package:branch1/telas/Relatos.dart';
+import 'package:branch1/telas/login_tela.dart';
+import 'package:branch1/services/chatbot_service.dart';
 import 'package:flutter/material.dart';
-import 'exportador_import.dart'; // Importa a tela do mapa
-
+import 'exportador_import.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class TelaPrincipal extends StatefulWidget {
   const TelaPrincipal({super.key});
@@ -10,28 +14,23 @@ class TelaPrincipal extends StatefulWidget {
   State<TelaPrincipal> createState() => _TelaPrincipalState();
 }
 
-class _TelaPrincipalState extends State<TelaPrincipal> {
-  // Inicia no índice 1 para abrir o Mapa logo de cara
+class _TelaPrincipalState extends State<TelaPrincipal>
+    with SingleTickerProviderStateMixin {
+  // ── Variáveis de estado ───────────────────────────────────────────────────
+  late List<Widget> _telas;
+
   bool estalogado = false;
 
-  int _currentIndex = 0;
+  late int _currentIndex;
 
-  void changePage(int index) {
-    setState(() {
-      _currentIndex = index;
-    });
-  }
 
-  // Definição das 4 páginas correspondentes aos ícones
-  late final List<Widget> _telas = [
-     Home(title: "SOS", onChangePage: changePage),
-     Maps_alertas(title:"SOS", onChangePage: changePage,), // O MAPA É A SEGUNDA PÁGINA (Índice 1)
-     Relatos_tela(title: "Relato", onChangePage: changePage),
-     Scaffold(body: Center(child: Text('Página: Clima', style: TextStyle(fontSize: 24)))),
-     Cadastro_tela(title: "Cadastro", onChangePage: changePage),
-  ];
+  String? emailCadastro;
+  String? senhaCadastro;
 
-  // Os ícones na exata ordem do design
+  // ── Animação do botão Nimbo ───────────────────────────────────────────────
+  late final AnimationController _nimboAnimController;
+  late final Animation<double> _nimboScaleAnim;
+
   final List<IconData> _icones = [
     Icons.warning_amber_rounded,
     Icons.location_on_outlined,
@@ -39,22 +38,174 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     Icons.cloud_queue,
   ];
 
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true, // Garante que o mapa passe por trás da barra transparente
-      body: _telas[_currentIndex],
-      bottomNavigationBar: _currentIndex == 4
-          ? null
-          :CustomAnimatedBottomBar(
-        currentIndex: _currentIndex,
-        icones: _icones,
-        onTap: (index) {
+  void initState() {
+    super.initState();
+    _currentIndex = Supabase.instance.client.auth.currentUser == null ? 5 : 0;
+
+    // Animação do botão Nimbo
+    _nimboAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.88,
+      upperBound: 1.0,
+    )..value = 1.0;
+    _nimboScaleAnim = _nimboAnimController;
+
+    _Ask_for_permission();
+    _inicializarTelas(); // cria as telas UMA VEZ SÓ
+  }
+
+  @override
+  void dispose() {
+    _nimboAnimController.dispose();
+    super.dispose();
+  }
+
+  // ── Inicializa a lista de telas ───────────────────────────────────────────
+  void _inicializarTelas() {
+    _telas = [
+      Home(title: "SOS", onChangePage: changePage),                          // 0
+      Maps_alertas(title: "SOS", onChangePage: changePage),                  // 1
+      Relatos_tela(title: "Relato", onChangePage: changePage),               // 2
+      ClimaTela(),                                                            // 3
+      Cadastro_tela(                                                          // 4
+        title: "Cadastro",
+        onChangePage: changePage,
+        onCadastroPendente: (email, senha) {
+          print("RECEBI EMAIL NA TELA PRINCIPAL: $email");
+          print("RECEBI SENHA NA TELA PRINCIPAL: $senha");
           setState(() {
-            _currentIndex = index;
+            emailCadastro = email;
+            senhaCadastro = senha;
+            _currentIndex = 6;
+            // Recria só o índice 6 com os dados que chegaram agora
+            _telas[6] = confEmail(
+              title: "Confirmação",
+              onChangePage: changePage,
+              email: emailCadastro,
+              senha: senhaCadastro,
+            );
           });
         },
       ),
+      sLogCad(title: "Landing Page", onChangePage: changePage),              // 5
+      confEmail(                                                              // 6
+        title: "Confirmação",
+        onChangePage: changePage,
+        email: emailCadastro,
+        senha: senhaCadastro,
+      ),
+      sLogin(title: "Login", onChangePage: changePage),                      // 7
+      TelaPerfil(title: "Perfil", onChangePage: changePage),                 // 8
+      ChatbotTela(title: 'Nimbo', onChangePage: changePage),                 // 9 — IA Chatbot
+    ];
+  }
+
+  // ── Permissão de localização ──────────────────────────────────────────────
+  Future<void> _Ask_for_permission() async {
+    PermissionStatus status = await Permission.location.request();
+
+    if (status.isGranted) {
+      Position position = await Geolocator.getCurrentPosition();
+    } else if (status.isDenied || status.isPermanentlyDenied) {
+      debugPrint('Permissão de localização negada pelo usuário.');
+    }
+  }
+
+  // ── Troca de página ───────────────────────────────────────────────────────
+  void changePage(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Telas que ocultam nav bar E o botão Nimbo
+    final bool ocultarNav = (
+      _currentIndex == 4 ||
+      _currentIndex == 5 ||
+      _currentIndex == 6 ||
+      _currentIndex == 7 ||
+      _currentIndex == 8
+    );
+    final bool noNimbo = _currentIndex == 9; // já está no chatbot
+
+    return Scaffold(
+      extendBody: true,
+      body: Stack(
+        children: [
+          // ── Conteúdo principal ────────────────────────────────────────────
+          IndexedStack(
+            index: _currentIndex,
+            children: _telas,
+          ),
+
+          // ── Botão flutuante Nimbo ─────────────────────────────────────────
+          // Aparece apenas nas telas com nav bar e quando não estamos no chatbot
+          if (!ocultarNav && !noNimbo)
+            Positioned(
+              bottom: 80, // logo acima da nav bar (altura 70)
+              right: 20,
+              child: ScaleTransition(
+                scale: _nimboScaleAnim,
+                child: GestureDetector(
+                  onTapDown: (_) => _nimboAnimController.reverse(),
+                  onTapUp: (_) {
+                    _nimboAnimController.forward();
+                    setState(() => _currentIndex = 9);
+                  },
+                  onTapCancel: () => _nimboAnimController.forward(),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B1426),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(32),
+                        topRight: Radius.circular(32),
+                        bottomLeft: Radius.circular(32),
+                        bottomRight: Radius.circular(4),
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.15),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Image.asset(
+                        'gfx/png/Image/nimbo_icon.png',
+                        fit: BoxFit.contain,
+                        isAntiAlias: true,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      bottomNavigationBar: ocultarNav || noNimbo
+          ? null
+          : CustomAnimatedBottomBar(
+              currentIndex: _currentIndex,
+              icones: _icones,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
     );
   }
 }
@@ -164,7 +315,8 @@ class MenuClipper extends CustomClipper<Path> {
 
     path.lineTo(notchCenter - 45, 0);
     path.cubicTo(notchCenter - 20, 0, notchCenter - 30, 45, notchCenter, 45);
-    path.cubicTo(notchCenter + 30, 45, notchCenter + 20, 0, notchCenter + 45, 0);
+    path.cubicTo(
+        notchCenter + 30, 45, notchCenter + 20, 0, notchCenter + 45, 0);
     path.lineTo(width, 0);
     path.lineTo(width, height);
     path.lineTo(0, height);

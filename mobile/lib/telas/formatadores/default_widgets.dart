@@ -13,6 +13,7 @@ class ContainerPerfilSuperior extends StatelessWidget{
 
   @override
   Widget build(BuildContext context){
+    final user = Supabase.instance.client.auth.currentUser;
     return Container(
       padding: EdgeInsets.fromLTRB(20, 0, 15, 0),
       child: SizedBox(
@@ -28,7 +29,7 @@ class ContainerPerfilSuperior extends StatelessWidget{
               child: InkWell(
                 borderRadius: BorderRadius.circular(33),
                 onTap: () {
-                  onChangePage(4);
+                    onChangePage(8);
                 },
 
                 child: Container(

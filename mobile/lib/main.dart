@@ -2,21 +2,34 @@ import 'package:branch1/telas/discarded/discarded_home.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'telas/exportador_import.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'controles/controle_acessibilidade.dart';
+import 'telas/exportador_import.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializa o Firebase (necessário para o Nimbo — chatbot IA)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   await Supabase.initialize(
     url: 'https://robfgvtnoooivihlnomr.supabase.co',
     anonKey: 'sb_publishable_eVCeoqzfhoAgkpBnJxzs7w_-PGO0TO9',
   );
 
-  // Carrega o arquivo .env (Certifique-se de que ele existe na raiz do projeto)
   await dotenv.load(fileName: ".env");
 
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AccessibilityController(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -24,13 +37,36 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final acessibilidade = context.watch<AccessibilityController>();
+
     return MaterialApp(
       title: 'SMDN App',
-      debugShowCheckedModeBanner: false, // Tira aquela faixa de "DEBUG" da tela
+      debugShowCheckedModeBanner: false,
+
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(
+              acessibilidade.escalaFonte,
+            ),
+          ),
+          child: child!,
+        );
+      },
+
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
+        scaffoldBackgroundColor: acessibilidade.fundo,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: acessibilidade.corPrimaria,
+          primary: acessibilidade.corPrimaria,
+          secondary: acessibilidade.corSecundaria,
+          brightness: acessibilidade.altoContraste
+              ? Brightness.dark
+              : Brightness.light,
+        ),
+        useMaterial3: true,
       ),
-      // O aplicativo abre direto aqui!
+
       home: const TelaPrincipal(),
     );
   }

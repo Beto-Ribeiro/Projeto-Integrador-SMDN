@@ -30,6 +30,7 @@ environment:
 dependencies:
     flutter:
       sdk: flutter
+    provider: ^6.1.2
     flutter_dotenv: ^6.0.1
     geolocator: ^14.0.2
     google_maps_flutter: ^2.5.3 # Verifique a versão mais atual no pub.dev
@@ -38,6 +39,11 @@ dependencies:
     supabase_flutter: ^2.12.4
     image_picker: ^1.1.2
     file_picker: ^8.0.0
+    cupertino_icons: ^1.0.8
+    location: ^5.0.3
+    http: ^1.2.0
+    firebase_core: ^4.10.0
+    firebase_ai: ^3.12.2
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +55,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -98,3 +105,11 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "lib/favicon.png"
+  web:
+    generate: true
+    image_path: "lib/favicon.png"

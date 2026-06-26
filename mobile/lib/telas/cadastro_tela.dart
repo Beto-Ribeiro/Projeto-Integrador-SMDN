@@ -7,11 +7,13 @@ import 'package:branch1/main.dart';
 
 class Cadastro_tela extends StatefulWidget {
   final Function(int) onChangePage;
+  final Function(String email, String senha) onCadastroPendente;
 
   const Cadastro_tela({
     super.key,
     required this.title,
     required this.onChangePage,
+    required this.onCadastroPendente,
   });
 
   final String title;
@@ -113,23 +115,36 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
 
       final user = authResponse.user;
 
-      print(user);
-
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Usuário não autenticado.',
-            ),
-          ),
-        );
-
-        setState(() {
-          _estaCarregando = false;
-        });
-
-        return;
+      if (authResponse.session != null) {
+        widget.onChangePage(0);
+      } else if (authResponse.user != null) {
+        widget.onCadastroPendente(Email, Senha);
       }
+
+      print("USER: ${authResponse.user}");
+      print("SESSION: ${authResponse.session}");
+      print("CURRENT: ${Supabase.instance.client.auth.currentUser}");
+
+      //if (user == null) {
+      //  ScaffoldMessenger.of(context).showSnackBar(
+      //    const SnackBar(
+      //      content: Text(
+      //        'Usuário não autenticado.',
+      //      ),
+      //    ),
+      //  );
+//
+      //  setState(() {
+      //    _estaCarregando = false;
+      //  });
+//
+      //  return;
+      //}
+      //else {
+      //  widget.onChangePage(0);
+      //}
+
+
 
       _NomeController.clear();
       _CPFController.clear();
@@ -147,8 +162,6 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
         ),
       );
 
-      widget.onChangePage(0);
-
     } catch (e) {
       print(e);
 
@@ -164,6 +177,7 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
     setState(() {
       _estaCarregando = false;
     });
+
   }
 
   void _showDatePicker() {
@@ -195,234 +209,256 @@ class _Cadastro_telaState extends State<Cadastro_tela> {
               painter: AbstractBackgroundPainter(),
             ),
           ),
-
           SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                verticalDirection: VerticalDirection.up,
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  child: Column(
+                    verticalDirection: VerticalDirection.up,
 
-                mainAxisSize: MainAxisSize.max,
+                    mainAxisSize: MainAxisSize.max,
 
-                children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(
-                      25,
-                      50,
-                      25,
-                      50,
-                    ),
-                    width: double.infinity,
-                    constraints: BoxConstraints(
-                      minHeight: MediaQuery.of(context).size.height,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(
+                          25,
+                          50,
+                          25,
+                          50,
+                        ),
+                        width: double.infinity,
+                        constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
 
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(30),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(30),
 
-                        topRight: Radius.circular(30),
-                      ),
-                    ),
-
-                    child: Column(
-                      spacing: 15,
-
-                      children: <Widget>[
-                        Text(
-                          "Vamos Começar??",
-
-                          style: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.blueGrey,
+                            topRight: Radius.circular(30),
                           ),
                         ),
 
-                        SizedBox(
-                          width: 350,
+                        child: Column(
+                          spacing: 15,
 
-                          child: TextField(
-                            controller: _NomeController,
+                          children: <Widget>[
+                            Text(
+                              "Vamos Começar??",
 
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-
-                              labelText: 'Digite seu Nome',
+                              style: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w700,
+                                color: Color.fromRGBO(24, 57, 92, 1),
+                              ),
                             ),
-                          ),
-                        ),
 
-                        SizedBox(
-                          width: 350,
+                            SizedBox(
+                              width: 350,
 
-                          child: TextField(
-                            controller: _CPFController,
+                              child: TextField(
+                                controller: _NomeController,
 
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
 
-                              labelText: 'Digite seu CPF',
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(
-                          width: 350,
-
-                          child: TextField(
-                            controller: _RgController,
-
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-
-                              labelText: 'Digite seu RG',
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(
-                          width: 350,
-
-                          child: TextField(
-                            controller: _TelController,
-
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-
-                              labelText: 'Número de telefone',
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(
-                          width: 350,
-
-                          child: TextField(
-                            controller: _EmailController,
-
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-
-                              labelText: 'Digite seu E-mail',
-                            ),
-                          ),
-                        ),
-                        Text('Insira sua data de nascimento'),
-                        Row(
-                          spacing: 10,
-                          mainAxisSize: MainAxisSize.max,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ElevatedButton(
-                              onPressed: _estaCarregando
-                                  ? null
-                                  : _showDatePicker,
-
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blueGrey,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(5),
+                                  labelText: 'Digite seu Nome',
                                 ),
-                                minimumSize: Size(30, 40),
-                              ),
-
-                              child: Icon(
-                                Icons.calendar_month,
-                                color: Colors.white,
                               ),
                             ),
-                            Container(
-                              width: 250,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.blueGrey[100],
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.max,
 
-                                children: [
-                                  Text(
-                                    _dateTime.day.toString() +
-                                        "/" +
-                                        _dateTime.month.toString() +
-                                        "/" +
-                                        _dateTime.year.toString(),
-                                    style: TextStyle(color: Colors.black),
+                            SizedBox(
+                              width: 350,
+
+                              child: TextField(
+                                controller: _CPFController,
+
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+
+                                  labelText: 'Digite seu CPF',
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(
+                              width: 350,
+
+                              child: TextField(
+                                controller: _RgController,
+
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+
+                                  labelText: 'Digite seu RG',
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(
+                              width: 350,
+
+                              child: TextField(
+                                controller: _TelController,
+
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+
+                                  labelText: 'Número de telefone',
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(
+                              width: 350,
+
+                              child: TextField(
+                                controller: _EmailController,
+
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+
+                                  labelText: 'Digite seu E-mail',
+                                ),
+                              ),
+                            ),
+                            Text('Insira sua data de nascimento'),
+                            Row(
+                              spacing: 10,
+                              mainAxisSize: MainAxisSize.max,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: _estaCarregando
+                                      ? null
+                                      : _showDatePicker,
+
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blueGrey,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    minimumSize: Size(30, 40),
                                   ),
-                                ],
+
+                                  child: Icon(
+                                    Icons.calendar_month,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Container(
+                                  width: 250,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueGrey[100],
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.max,
+
+                                    children: [
+                                      Text(
+                                        _dateTime.day.toString() +
+                                            "/" +
+                                            _dateTime.month.toString() +
+                                            "/" +
+                                            _dateTime.year.toString(),
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(
+                              width: 350,
+
+                              child: TextField(
+                                controller: _SenhaController,
+
+                                obscureText: true,
+
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+
+                                  labelText: 'Digite sua senha',
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(
+                              width: 350,
+
+                              child: TextField(
+                                controller: _ConSenhaController,
+
+                                obscureText: true,
+
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+
+                                  labelText: 'Confirme sua senha',
+                                ),
+                              ),
+                            ),
+
+                            ElevatedButton(
+                              onPressed: _estaCarregando ? null : _enviarDados,
+
+                              child: _estaCarregando
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Enviar',
+                                        style: TextStyle(color: Colors.white)
+                                    ),
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color.fromRGBO(24, 57, 92, 1),
+                                  minimumSize: Size(139, 40)
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(
-                          width: 350,
+                      ),
 
-                          child: TextField(
-                            controller: _SenhaController,
-
-                            obscureText: true,
-
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-
-                              labelText: 'Digite sua senha',
-                            ),
-                          ),
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(
+                          0,
+                          80,
+                          0,
+                          80,
                         ),
 
-                        SizedBox(
-                          width: 350,
-
-                          child: TextField(
-                            controller: _ConSenhaController,
-
-                            obscureText: true,
-
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-
-                              labelText: 'Confirme sua senha',
-                            ),
-                          ),
+                        child: Image.asset(
+                          "gfx/png/Image/SMDN.png",
+                          height: 60,
                         ),
-
-                        ElevatedButton(
-                          onPressed: _estaCarregando ? null : _enviarDados,
-
-                          child: _estaCarregando
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Enviar',
-                                ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(
-                      0,
-                      80,
-                      0,
-                      80,
-                    ),
-
-                    child: Image.asset(
-                      "gfx/png/Image/SMDN.png",
-                      height: 60,
-                    ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    widget.onChangePage(5);
+                  },
+                  child: Icon(
+                    Icons.arrow_back,
+                    size: 15,
+                    fontWeight: FontWeight(800),
+                    color: Color.fromRGBO(228, 232, 235, 1),
                   ),
-                ],
-              ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color.fromRGBO(228, 232, 235, 0.2),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
