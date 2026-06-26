@@ -2,6 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import assistantIcon from '../assets/assistant/assistant-icon.svg'
 import { askSmdnAssistant } from '../backend/ai/assistantService.js'
 import { buildSmdnOperationalContext } from '../backend/ai/smdnContextService.js'
+import { collectCurrentUiContext, executeAssistantUiActions } from '../backend/ai/domContextService.js'
+import { useAuth } from '../hooks/useAuth.js'
 
 const SCREEN_CONTEXT = {
   dashboard: {
@@ -46,6 +48,45 @@ const SCREEN_CONTEXT = {
   },
 }
 
+const MIN_PANEL_WIDTH = 340
+const MIN_PANEL_HEIGHT = 430
+const EDGE_GAP = 8
+
+function getViewport() {
+  return {
+    width: window.innerWidth || 1366,
+    height: window.innerHeight || 768,
+  }
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function clampPanel(panel) {
+  const viewport = getViewport()
+  const maxWidth = Math.max(MIN_PANEL_WIDTH, viewport.width - EDGE_GAP * 2)
+  const maxHeight = Math.max(MIN_PANEL_HEIGHT, viewport.height - EDGE_GAP * 2)
+  const width = clamp(panel.width, MIN_PANEL_WIDTH, maxWidth)
+  const height = clamp(panel.height, MIN_PANEL_HEIGHT, maxHeight)
+  const x = clamp(panel.x, EDGE_GAP, Math.max(EDGE_GAP, viewport.width - width - EDGE_GAP))
+  const y = clamp(panel.y, EDGE_GAP, Math.max(EDGE_GAP, viewport.height - height - EDGE_GAP))
+
+  return { x, y, width, height }
+}
+
+function createInitialPanel(compact = false) {
+  const viewport = getViewport()
+  const width = 420
+  const height = Math.min(760, Math.max(MIN_PANEL_HEIGHT, viewport.height - 80))
+  return clampPanel({
+    x: compact ? 70 : 210,
+    y: Math.max(EDGE_GAP, viewport.height - height - 64),
+    width,
+    height,
+  })
+}
+
 function SparkIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -60,9 +101,69 @@ function buildInitialMessages(context) {
   return [
     {
       role: 'assistant',
-      text: `Oi! Estou vendo a tela ${context.title}. Posso consultar os dados reais do SMDN e te ajudar com usuários, auditoria, ocorrências e prioridades.`,
+      text: `Oi! Estou vendo a tela ${context.title}. Posso consultar dados reais, ler popups abertos, preencher campos, navegar e agir como suporte geral do SMDN.`,
     },
   ]
+}
+
+function getInitials(nameOrEmail) {
+  const value = String(nameOrEmail || 'Usuário').replace(/@.*/, '').trim()
+  return (
+    value
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || 'U'
+  )
+}
+
+function getUserDisplayName(user) {
+  return (
+    user?.name ||
+    user?.prf_nome ||
+    user?.perfil?.prf_nome ||
+    user?.email ||
+    user?.prf_email_contato ||
+    'Usuário SMDN'
+  )
+}
+
+function getUserAvatarUrl(user) {
+  return (
+    user?.avatar ||
+    user?.avatarUrl ||
+    user?.prf_avatar_url ||
+    user?.perfil?.prf_avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    null
+  )
+}
+
+function UserMessageAvatar({ user }) {
+  const name = getUserDisplayName(user)
+  const avatarUrl = getUserAvatarUrl(user)
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={`Foto de ${name}`}
+        className="mt-0.5 h-8 w-8 rounded-xl border border-white/10 object-cover flex-shrink-0 bg-text-main/20"
+      />
+    )
+  }
+
+  return (
+    <div
+      className="mt-0.5 h-8 w-8 rounded-xl border border-white/10 bg-text-main/30 flex items-center justify-center flex-shrink-0"
+      aria-label={`Avatar de ${name}`}
+      title={name}
+    >
+      <span className="text-[10px] font-black text-white">{getInitials(name)}</span>
+    </div>
+  )
 }
 
 function renderInlineMarkdown(text) {
@@ -119,15 +220,18 @@ function normalizeAction(action) {
 }
 
 export default function AssistantWidget({ currentScreen, setCurrentScreen, compact = false }) {
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [panel, setPanel] = useState(() => createInitialPanel(compact))
 
   const panelRef = useRef(null)
   const buttonRef = useRef(null)
   const messagesEndRef = useRef(null)
+  const interactionRef = useRef(null)
 
   const context = useMemo(
     () => SCREEN_CONTEXT[currentScreen] || SCREEN_CONTEXT.dashboard,
@@ -145,33 +249,104 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
   }, [messages, sending])
 
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (!open) return
+    function handleResizeWindow() {
+      setPanel((current) => clampPanel(current))
+    }
 
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(event.target) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target)
-      ) {
-        setOpen(false)
+    window.addEventListener('resize', handleResizeWindow)
+    return () => window.removeEventListener('resize', handleResizeWindow)
+  }, [])
+
+  useEffect(() => {
+    function handlePointerMove(event) {
+      const interaction = interactionRef.current
+      if (!interaction) return
+
+      event.preventDefault()
+
+      const dx = event.clientX - interaction.startX
+      const dy = event.clientY - interaction.startY
+
+      if (interaction.type === 'drag') {
+        setPanel(
+          clampPanel({
+            ...interaction.startPanel,
+            x: interaction.startPanel.x + dx,
+            y: interaction.startPanel.y + dy,
+          })
+        )
+        return
+      }
+
+      if (interaction.type === 'resize') {
+        const next = { ...interaction.startPanel }
+        const direction = interaction.direction
+
+        if (direction.includes('e')) next.width = interaction.startPanel.width + dx
+        if (direction.includes('s')) next.height = interaction.startPanel.height + dy
+        if (direction.includes('w')) {
+          next.width = interaction.startPanel.width - dx
+          next.x = interaction.startPanel.x + dx
+        }
+        if (direction.includes('n')) {
+          next.height = interaction.startPanel.height - dy
+          next.y = interaction.startPanel.y + dy
+        }
+
+        setPanel(clampPanel(next))
       }
     }
 
-    function handleEscape(event) {
-      if (event.key === 'Escape') {
-        setOpen(false)
-      }
+    function handlePointerUp() {
+      interactionRef.current = null
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
+    window.addEventListener('mousemove', handlePointerMove)
+    window.addEventListener('mouseup', handlePointerUp)
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
+      window.removeEventListener('mousemove', handlePointerMove)
+      window.removeEventListener('mouseup', handlePointerUp)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
     }
-  }, [open])
+  }, [])
+
+  function startDrag(event) {
+    if (event.button !== 0) return
+
+    event.preventDefault()
+
+    interactionRef.current = {
+      type: 'drag',
+      startX: event.clientX,
+      startY: event.clientY,
+      startPanel: panel,
+    }
+
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'move'
+  }
+
+  function startResize(event, direction, cursor) {
+    if (event.button !== 0) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    interactionRef.current = {
+      type: 'resize',
+      direction,
+      startX: event.clientX,
+      startY: event.clientY,
+      startPanel: panel,
+    }
+
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = cursor
+  }
 
   function restartChat() {
     setMessages(buildInitialMessages(context))
@@ -179,14 +354,10 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
     setError('')
   }
 
-  function applyAssistantActions(actions = []) {
+  function applyLegacyActions(actions = []) {
     const normalizedActions = actions.map(normalizeAction).filter(Boolean)
 
     for (const action of normalizedActions) {
-      if (action.type === 'navigate' && SCREEN_CONTEXT[action.screen]) {
-        setCurrentScreen(action.screen)
-      }
-
       if (action.type === 'open_user') {
         const detail = {
           mode: 'open',
@@ -200,7 +371,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
       if (action.type === 'filter_users') {
         const detail = {
           mode: 'filter',
-          query: action.query || action.role || action.type || '',
+          query: action.query || action.role || action.userType || action.type || '',
         }
         window.__SMDN_AI_PENDING_USER_ACTION = detail
         setCurrentScreen('users')
@@ -250,6 +421,11 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
         currentScreen,
       })
 
+      const uiContext = collectCurrentUiContext({
+        currentScreen,
+        screenTitle: context.title,
+      })
+
       const result = await askSmdnAssistant({
         message: cleanText,
         currentScreen,
@@ -257,15 +433,26 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
         screenIntro: context.intro,
         history: historyBeforeSend,
         operationalContext,
+        uiContext,
       })
 
-      applyAssistantActions(result.actions)
+      applyLegacyActions(result.actions)
+
+      const uiResults = await executeAssistantUiActions(result.actions, {
+        setCurrentScreen,
+      })
+
+      const blocked = uiResults.filter((item) => item.ok === false && item.reason)
+      const extra =
+        blocked.length > 0
+          ? `\n\n*Observação:* ${blocked.map((item) => item.reason).join('; ')}`
+          : ''
 
       setMessages((current) => [
         ...current,
         {
           role: 'assistant',
-          text: result.text || 'Não consegui gerar uma resposta agora.',
+          text: `${result.text || 'Não consegui gerar uma resposta agora.'}${extra}`,
         },
       ])
     } catch (err) {
@@ -297,31 +484,38 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
       {open && (
         <div
           ref={panelRef}
-          className={`fixed bottom-16 ${compact ? 'left-[70px]' : 'left-[210px]'} z-[99998] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col`}
+          className="fixed z-[99998] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col"
           style={{
-            resize: 'both',
-            width: '420px',
-            height: 'min(760px, calc(100vh - 5rem))',
-            minWidth: '340px',
-            minHeight: '430px',
-            maxWidth: 'min(90vw, 760px)',
-            maxHeight: 'calc(100vh - 5rem)',
+            left: `${panel.x}px`,
+            top: `${panel.y}px`,
+            width: `${panel.width}px`,
+            height: `${panel.height}px`,
           }}
           role="dialog"
           aria-label="Assistente IA SMDN"
         >
-          <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3 bg-text-main/5">
+          <div
+            className="flex cursor-move items-center justify-between gap-3 border-b border-border-soft px-4 py-3 bg-text-main/5"
+            onMouseDown={startDrag}
+            title="Arraste para mover o chat"
+          >
             <button
               type="button"
               onClick={restartChat}
+              onMouseDown={(event) => event.stopPropagation()}
               className="rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
             >
               Reiniciar chat
             </button>
 
+            <span className="hidden text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:inline">
+              Arraste para mover
+            </span>
+
             <button
               type="button"
               onClick={() => setOpen(false)}
+              onMouseDown={(event) => event.stopPropagation()}
               className="rounded-lg p-2 text-slate-400 hover:bg-white/60 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
               aria-label="Fechar assistente"
             >
@@ -356,6 +550,8 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                   >
                     {renderMessageText(message.text)}
                   </div>
+
+                  {!isAssistant && <UserMessageAvatar user={user} />}
                 </div>
               )
             })}
@@ -369,7 +565,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                   aria-hidden="true"
                 />
                 <div className="rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-700 mr-3">
-                  Consultando dados reais do SMDN e pensando...
+                  Lendo telas, dados reais e popups abertos...
                 </div>
               </div>
             )}
@@ -443,6 +639,15 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
               </button>
             </div>
           </div>
+
+          <button type="button" aria-label="Redimensionar para cima" className="absolute left-4 right-4 top-0 h-2 cursor-ns-resize" onMouseDown={(event) => startResize(event, 'n', 'ns-resize')} />
+          <button type="button" aria-label="Redimensionar para baixo" className="absolute bottom-0 left-4 right-4 h-2 cursor-ns-resize" onMouseDown={(event) => startResize(event, 's', 'ns-resize')} />
+          <button type="button" aria-label="Redimensionar para esquerda" className="absolute bottom-4 left-0 top-4 w-2 cursor-ew-resize" onMouseDown={(event) => startResize(event, 'w', 'ew-resize')} />
+          <button type="button" aria-label="Redimensionar para direita" className="absolute bottom-4 right-0 top-4 w-2 cursor-ew-resize" onMouseDown={(event) => startResize(event, 'e', 'ew-resize')} />
+          <button type="button" aria-label="Redimensionar canto superior esquerdo" className="absolute left-0 top-0 h-4 w-4 cursor-nwse-resize" onMouseDown={(event) => startResize(event, 'nw', 'nwse-resize')} />
+          <button type="button" aria-label="Redimensionar canto superior direito" className="absolute right-0 top-0 h-4 w-4 cursor-nesw-resize" onMouseDown={(event) => startResize(event, 'ne', 'nesw-resize')} />
+          <button type="button" aria-label="Redimensionar canto inferior esquerdo" className="absolute bottom-0 left-0 h-4 w-4 cursor-nesw-resize" onMouseDown={(event) => startResize(event, 'sw', 'nesw-resize')} />
+          <button type="button" aria-label="Redimensionar canto inferior direito" className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-tl-lg bg-text-main/20 hover:bg-text-main/30" onMouseDown={(event) => startResize(event, 'se', 'nwse-resize')} title="Redimensionar" />
         </div>
       )}
     </div>
