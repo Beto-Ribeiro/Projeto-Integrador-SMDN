@@ -2,8 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import assistantIcon from '../assets/assistant/assistant-icon.svg'
 import { askSmdnAssistant } from '../backend/ai/assistantService.js'
 import { buildSmdnOperationalContext } from '../backend/ai/smdnContextService.js'
-import { collectCurrentUiContext, executeAssistantUiActions } from '../backend/ai/domContextService.js'
 import { useAuth } from '../hooks/useAuth.js'
+import { useSmdnSettings } from '../hooks/useSmdnSettings.js'
 
 const SCREEN_CONTEXT = {
   dashboard: {
@@ -48,44 +48,7 @@ const SCREEN_CONTEXT = {
   },
 }
 
-const MIN_PANEL_WIDTH = 340
-const MIN_PANEL_HEIGHT = 430
-const EDGE_GAP = 8
-
-function getViewport() {
-  return {
-    width: window.innerWidth || 1366,
-    height: window.innerHeight || 768,
-  }
-}
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max)
-}
-
-function clampPanel(panel) {
-  const viewport = getViewport()
-  const maxWidth = Math.max(MIN_PANEL_WIDTH, viewport.width - EDGE_GAP * 2)
-  const maxHeight = Math.max(MIN_PANEL_HEIGHT, viewport.height - EDGE_GAP * 2)
-  const width = clamp(panel.width, MIN_PANEL_WIDTH, maxWidth)
-  const height = clamp(panel.height, MIN_PANEL_HEIGHT, maxHeight)
-  const x = clamp(panel.x, EDGE_GAP, Math.max(EDGE_GAP, viewport.width - width - EDGE_GAP))
-  const y = clamp(panel.y, EDGE_GAP, Math.max(EDGE_GAP, viewport.height - height - EDGE_GAP))
-
-  return { x, y, width, height }
-}
-
-function createInitialPanel(compact = false) {
-  const viewport = getViewport()
-  const width = 420
-  const height = Math.min(760, Math.max(MIN_PANEL_HEIGHT, viewport.height - 80))
-  return clampPanel({
-    x: compact ? 70 : 210,
-    y: Math.max(EDGE_GAP, viewport.height - height - 64),
-    width,
-    height,
-  })
-}
+const CHAT_STORAGE_KEY = 'smdn-nimbo-chat-unico-browser-v1'
 
 function SparkIcon() {
   return (
@@ -97,73 +60,148 @@ function SparkIcon() {
   )
 }
 
-function buildInitialMessages(context) {
+function buildInitialMessages() {
   return [
     {
       role: 'assistant',
-      text: `Oi! Estou vendo a tela ${context.title}. Posso consultar dados reais, ler popups abertos, preencher campos, navegar e agir como suporte geral do SMDN.`,
+      text: 'Oi, me chamo Nimbo. Como Nimbo pode te ajudar hoje?',
+    },
+    {
+      role: 'assistant',
+      text: 'Posso ver sua tela e irei te guiar sempre que precisar.',
     },
   ]
 }
 
-function getInitials(nameOrEmail) {
-  const value = String(nameOrEmail || 'Usuário').replace(/@.*/, '').trim()
-  return (
-    value
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase() || 'U'
-  )
+function safeStorageKey() {
+  return CHAT_STORAGE_KEY
 }
 
-function getUserDisplayName(user) {
-  return (
-    user?.name ||
-    user?.prf_nome ||
-    user?.perfil?.prf_nome ||
-    user?.email ||
-    user?.prf_email_contato ||
-    'Usuário SMDN'
-  )
+function readStoredMessages(key) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || '[]')
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved
+        .filter((item) => item?.role && typeof item?.text === 'string')
+        .slice(-24)
+    }
+  } catch {
+    // ignora histórico corrompido
+  }
+
+  return buildInitialMessages()
 }
 
-function getUserAvatarUrl(user) {
-  return (
-    user?.avatar ||
-    user?.avatarUrl ||
-    user?.prf_avatar_url ||
-    user?.perfil?.prf_avatar_url ||
-    user?.user_metadata?.avatar_url ||
-    null
-  )
+function writeStoredMessages(key, messages) {
+  try {
+    const safeMessages = (messages || [])
+      .filter((item) => item?.role && typeof item?.text === 'string')
+      .slice(-40)
+
+    localStorage.setItem(key, JSON.stringify(safeMessages))
+  } catch {
+    // ignora storage indisponível
+  }
 }
 
-function UserMessageAvatar({ user }) {
-  const name = getUserDisplayName(user)
-  const avatarUrl = getUserAvatarUrl(user)
+function getAccountProfile(user, session) {
+  const authUser = user || session?.user || {}
+  const perfil = authUser?.perfil || {}
 
-  if (avatarUrl) {
+  const name =
+    authUser?.name ||
+    authUser?.nome ||
+    perfil?.prf_nome ||
+    authUser?.user_metadata?.name ||
+    authUser?.email?.split('@')[0] ||
+    'Usuário'
+
+
+  return {
+    id: authUser?.id || session?.user?.id || 'sem-conta',
+    name,
+    avatar:
+      authUser?.avatar ||
+      authUser?.avatarUrl ||
+      perfil?.prf_avatar_url ||
+      authUser?.user_metadata?.avatar_url ||
+      '',
+    role:
+      authUser?.roleLabel ||
+      authUser?.role ||
+      perfil?.prf_tipo ||
+      'Conta SMDN',
+  }
+}
+
+function initialsFromName(name) {
+  return String(name || 'U')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+function UserAvatar({ account }) {
+  if (!account) return null
+
+  if (account.avatar) {
     return (
       <img
-        src={avatarUrl}
-        alt={`Foto de ${name}`}
-        className="mt-0.5 h-8 w-8 rounded-xl border border-white/10 object-cover flex-shrink-0 bg-text-main/20"
+        src={account.avatar}
+        alt=""
+        className="mt-0.5 h-8 w-8 rounded-xl border border-border-soft object-cover flex-shrink-0"
+        aria-hidden="true"
       />
     )
   }
 
   return (
-    <div
-      className="mt-0.5 h-8 w-8 rounded-xl border border-white/10 bg-text-main/30 flex items-center justify-center flex-shrink-0"
-      aria-label={`Avatar de ${name}`}
-      title={name}
+    <span
+      className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-border-soft bg-slate-100 text-[10px] font-black text-slate-700"
+      aria-hidden="true"
     >
-      <span className="text-[10px] font-black text-white">{getInitials(name)}</span>
+      {initialsFromName(account.name)}
+    </span>
+  )
+}
+
+function AccountBadge({ account, compact = false }) {
+  if (!account) return null
+
+  return (
+    <div className={`flex items-center gap-2 ${compact ? 'justify-end' : ''}`}>
+      {account.avatar ? (
+        <img
+          src={account.avatar}
+          alt=""
+          className="h-7 w-7 rounded-full border border-white/30 object-cover"
+          aria-hidden="true"
+        />
+      ) : (
+        <span
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-slate-200 text-[10px] font-black text-slate-700"
+          aria-hidden="true"
+        >
+          {initialsFromName(account.name)}
+        </span>
+      )}
+
+      <span className={`min-w-0 ${compact ? 'text-right' : ''}`}>
+        <span className="block truncate text-[11px] font-black leading-tight text-inherit">
+          {account.name || 'Usuário'}
+        </span>
+      </span>
     </div>
   )
+}
+
+function clearPendingAiActions() {
+  window.__SMDN_AI_PENDING_USER_ACTION = null
+  window.__SMDN_AI_PENDING_DASHBOARD_ACTION = null
+  window.__SMDN_AI_PENDING_AUDIT_ACTION = null
 }
 
 function renderInlineMarkdown(text) {
@@ -219,145 +257,156 @@ function normalizeAction(action) {
   }
 }
 
+function normalizeDashboardAction(action) {
+  return {
+    id: action.id || action.relatoId || '',
+    relatoId: action.relatoId || action.id || '',
+    query: action.query || action.title || '',
+    mapMode: action.mapMode === 'points' || action.mapMode === 'victims' ? action.mapMode : 'heat',
+    zoom: Number.isFinite(Number(action.zoom)) ? Number(action.zoom) : 16,
+    openPopup: action.openPopup !== false,
+  }
+}
+
 export default function AssistantWidget({ currentScreen, setCurrentScreen, compact = false }) {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
+  const { settings } = useSmdnSettings()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const [panel, setPanel] = useState(() => createInitialPanel(compact))
 
   const panelRef = useRef(null)
   const buttonRef = useRef(null)
   const messagesEndRef = useRef(null)
-  const interactionRef = useRef(null)
+  const dragStateRef = useRef(null)
+  const [panelPosition, setPanelPosition] = useState(null)
+
+  const accountProfile = useMemo(() => getAccountProfile(user, session), [user, session])
+  const accountId = accountProfile.id
 
   const context = useMemo(
     () => SCREEN_CONTEXT[currentScreen] || SCREEN_CONTEXT.dashboard,
     [currentScreen]
   )
 
-  useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages(buildInitialMessages(context))
+  const chatStorageKey = useMemo(() => safeStorageKey(), [])
+
+  function getDefaultPanelPosition() {
+    if (typeof window === 'undefined') {
+      return { x: compact ? 70 : 210, y: 96 }
     }
-  }, [context, messages.length, open])
+
+    const panelHeight = Math.min(760, window.innerHeight - 80)
+    return {
+      x: compact ? 70 : 210,
+      y: Math.max(16, window.innerHeight - panelHeight - 64),
+    }
+  }
+
+  function clampPanelPosition(x, y) {
+    if (typeof window === 'undefined') return { x, y }
+
+    const panelWidth = panelRef.current?.offsetWidth || 420
+    const panelHeight = panelRef.current?.offsetHeight || Math.min(760, window.innerHeight - 80)
+
+    return {
+      x: Math.min(Math.max(8, x), Math.max(8, window.innerWidth - panelWidth - 8)),
+      y: Math.min(Math.max(8, y), Math.max(8, window.innerHeight - panelHeight - 8)),
+    }
+  }
+
+  function startPanelDrag(event) {
+    if (event.button !== 0) return
+    if (event.target.closest('button, textarea, input, select, a')) return
+
+    const currentPosition = panelPosition || getDefaultPanelPosition()
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: currentPosition.x,
+      originY: currentPosition.y,
+    }
+
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  function movePanelDrag(event) {
+    const drag = dragStateRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    const next = clampPanelPosition(
+      drag.originX + event.clientX - drag.startX,
+      drag.originY + event.clientY - drag.startY
+    )
+
+    setPanelPosition(next)
+  }
+
+  function endPanelDrag(event) {
+    if (dragStateRef.current?.pointerId === event.pointerId) {
+      dragStateRef.current = null
+    }
+  }
+
+  useEffect(() => {
+    if (open && !panelPosition) {
+      setPanelPosition(getDefaultPanelPosition())
+    }
+  }, [open, panelPosition])
+
+  useEffect(() => {
+    setMessages(readStoredMessages(chatStorageKey))
+    setDraft('')
+    setError('')
+    setSending(false)
+    clearPendingAiActions()
+  }, [chatStorageKey])
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      writeStoredMessages(chatStorageKey, messages)
+    }
+  }, [chatStorageKey, messages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, sending])
 
   useEffect(() => {
-    function handleResizeWindow() {
-      setPanel((current) => clampPanel(current))
-    }
-
-    window.addEventListener('resize', handleResizeWindow)
-    return () => window.removeEventListener('resize', handleResizeWindow)
-  }, [])
-
-  useEffect(() => {
-    function handlePointerMove(event) {
-      const interaction = interactionRef.current
-      if (!interaction) return
-
-      event.preventDefault()
-
-      const dx = event.clientX - interaction.startX
-      const dy = event.clientY - interaction.startY
-
-      if (interaction.type === 'drag') {
-        setPanel(
-          clampPanel({
-            ...interaction.startPanel,
-            x: interaction.startPanel.x + dx,
-            y: interaction.startPanel.y + dy,
-          })
-        )
-        return
-      }
-
-      if (interaction.type === 'resize') {
-        const next = { ...interaction.startPanel }
-        const direction = interaction.direction
-
-        if (direction.includes('e')) next.width = interaction.startPanel.width + dx
-        if (direction.includes('s')) next.height = interaction.startPanel.height + dy
-        if (direction.includes('w')) {
-          next.width = interaction.startPanel.width - dx
-          next.x = interaction.startPanel.x + dx
-        }
-        if (direction.includes('n')) {
-          next.height = interaction.startPanel.height - dy
-          next.y = interaction.startPanel.y + dy
-        }
-
-        setPanel(clampPanel(next))
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        setOpen(false)
       }
     }
 
-    function handlePointerUp() {
-      interactionRef.current = null
-      document.body.style.userSelect = ''
-      document.body.style.cursor = ''
-    }
-
-    window.addEventListener('mousemove', handlePointerMove)
-    window.addEventListener('mouseup', handlePointerUp)
+    document.addEventListener('keydown', handleEscape)
 
     return () => {
-      window.removeEventListener('mousemove', handlePointerMove)
-      window.removeEventListener('mouseup', handlePointerUp)
-      document.body.style.userSelect = ''
-      document.body.style.cursor = ''
+      document.removeEventListener('keydown', handleEscape)
     }
   }, [])
 
-  function startDrag(event) {
-    if (event.button !== 0) return
-
-    event.preventDefault()
-
-    interactionRef.current = {
-      type: 'drag',
-      startX: event.clientX,
-      startY: event.clientY,
-      startPanel: panel,
-    }
-
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor = 'move'
-  }
-
-  function startResize(event, direction, cursor) {
-    if (event.button !== 0) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    interactionRef.current = {
-      type: 'resize',
-      direction,
-      startX: event.clientX,
-      startY: event.clientY,
-      startPanel: panel,
-    }
-
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor = cursor
-  }
-
   function restartChat() {
-    setMessages(buildInitialMessages(context))
+    const initialMessages = buildInitialMessages()
+    setMessages(initialMessages)
+    writeStoredMessages(chatStorageKey, initialMessages)
     setDraft('')
     setError('')
+    clearPendingAiActions()
   }
 
-  function applyLegacyActions(actions = []) {
+  function applyAssistantActions(actions = []) {
     const normalizedActions = actions.map(normalizeAction).filter(Boolean)
 
     for (const action of normalizedActions) {
+      if (action.type === 'navigate' && SCREEN_CONTEXT[action.screen]) {
+        setCurrentScreen(action.screen)
+      }
+
       if (action.type === 'open_user') {
         const detail = {
           mode: 'open',
@@ -371,7 +420,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
       if (action.type === 'filter_users') {
         const detail = {
           mode: 'filter',
-          query: action.query || action.role || action.userType || action.type || '',
+          query: action.query || action.role || action.type || '',
         }
         window.__SMDN_AI_PENDING_USER_ACTION = detail
         setCurrentScreen('users')
@@ -379,10 +428,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
       }
 
       if (action.type === 'open_dashboard_occurrence') {
-        const detail = {
-          id: action.id || action.relatoId || '',
-          query: action.query || action.title || '',
-        }
+        const detail = normalizeDashboardAction(action)
         window.__SMDN_AI_PENDING_DASHBOARD_ACTION = detail
         setCurrentScreen('dashboard')
         scheduleUiEvent('smdn-ai-dashboard-open-occurrence', detail)
@@ -410,7 +456,15 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
     setSending(true)
     setDraft('')
 
-    const userMessage = { role: 'user', text: cleanText }
+    const userMessage = {
+      role: 'user',
+      text: cleanText,
+      accountId,
+      account: accountProfile,
+      screen: currentScreen,
+      screenTitle: context.title,
+      sentAt: new Date().toISOString(),
+    }
     const historyBeforeSend = messages
 
     setMessages((current) => [...current, userMessage])
@@ -421,10 +475,11 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
         currentScreen,
       })
 
-      const uiContext = collectCurrentUiContext({
-        currentScreen,
-        screenTitle: context.title,
-      })
+      operationalContext.currentAskingAccount = {
+        id: accountProfile.id,
+        name: accountProfile.name,
+        role: accountProfile.role,
+      }
 
       const result = await askSmdnAssistant({
         message: cleanText,
@@ -433,30 +488,24 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
         screenIntro: context.intro,
         history: historyBeforeSend,
         operationalContext,
-        uiContext,
       })
 
-      applyLegacyActions(result.actions)
-
-      const uiResults = await executeAssistantUiActions(result.actions, {
-        setCurrentScreen,
-      })
-
-      const blocked = uiResults.filter((item) => item.ok === false && item.reason)
-      const extra =
-        blocked.length > 0
-          ? `\n\n*Observação:* ${blocked.map((item) => item.reason).join('; ')}`
-          : ''
+      applyAssistantActions(result.actions)
 
       setMessages((current) => [
         ...current,
         {
           role: 'assistant',
-          text: `${result.text || 'Não consegui gerar uma resposta agora.'}${extra}`,
+          text: result.text || 'Nimbo não conseguiu gerar uma resposta agora.',
+          accountId,
+          replyToAccount: accountProfile,
+          screen: currentScreen,
+          screenTitle: context.title,
+          sentAt: new Date().toISOString(),
         },
       ])
     } catch (err) {
-      setError(err?.message || 'Não foi possível consultar a IA.')
+      setError(err?.message || 'Não foi possível consultar o Nimbo.')
     } finally {
       setSending(false)
     }
@@ -475,49 +524,56 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
         onClick={() => setOpen((value) => !value)}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-on-dark hover:bg-white/5 hover:text-white transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${compact ? 'justify-center' : ''}`}
         aria-expanded={open}
-        aria-label="Abrir IA SMDN"
+        aria-label="Abrir Nimbo"
       >
         <SparkIcon />
-        <span className={compact ? 'sr-only' : undefined}>IA SMDN</span>
+        <span className={compact ? 'sr-only' : undefined}>Nimbo: AI</span>
       </button>
 
       {open && (
         <div
           ref={panelRef}
-          className="fixed z-[99998] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col"
+          className="fixed z-[100050] overflow-hidden rounded-3xl border border-border-soft bg-bg-surface shadow-2xl animate-slide-up flex flex-col"
           style={{
-            left: `${panel.x}px`,
-            top: `${panel.y}px`,
-            width: `${panel.width}px`,
-            height: `${panel.height}px`,
+            resize: 'both',
+            width: '420px',
+            height: 'min(760px, calc(100vh - 5rem))',
+            minWidth: '340px',
+            minHeight: '430px',
+            maxWidth: 'min(90vw, 760px)',
+            maxHeight: 'calc(100vh - 5rem)',
+            left: `${(panelPosition || getDefaultPanelPosition()).x}px`,
+            top: `${(panelPosition || getDefaultPanelPosition()).y}px`,
           }}
           role="dialog"
-          aria-label="Assistente IA SMDN"
+          aria-label="Assistente Nimbo"
         >
           <div
-            className="flex cursor-move items-center justify-between gap-3 border-b border-border-soft px-4 py-3 bg-text-main/5"
-            onMouseDown={startDrag}
-            title="Arraste para mover o chat"
+            className="flex cursor-grab active:cursor-grabbing items-center justify-between gap-3 border-b border-border-soft px-4 py-3 bg-text-main/5 select-none"
+            onPointerDown={startPanelDrag}
+            onPointerMove={movePanelDrag}
+            onPointerUp={endPanelDrag}
+            onPointerCancel={endPanelDrag}
           >
             <button
               type="button"
               onClick={restartChat}
-              onMouseDown={(event) => event.stopPropagation()}
               className="rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
             >
               Reiniciar chat
             </button>
 
-            <span className="hidden text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:inline">
-              Arraste para mover
-            </span>
+            <div className="min-w-0 text-center">
+              <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">
+                Arraste para mover
+              </span>
+            </div>
 
             <button
               type="button"
               onClick={() => setOpen(false)}
-              onMouseDown={(event) => event.stopPropagation()}
               className="rounded-lg p-2 text-slate-400 hover:bg-white/60 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-text-main"
-              aria-label="Fechar assistente"
+              aria-label="Fechar Nimbo"
             >
               ×
             </button>
@@ -529,7 +585,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
 
               return (
                 <div
-                  key={`${message.role}-${index}`}
+                  key={`${message.role}-${index}-${message.text}`}
                   className={`flex items-start gap-2 ${isAssistant ? 'justify-start' : 'justify-end'}`}
                 >
                   {isAssistant && (
@@ -542,16 +598,16 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                   )}
 
                   <div
-                    className={`rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                       isAssistant
                         ? 'bg-slate-100 text-slate-700 mr-3'
-                        : 'bg-text-main text-white ml-8'
+                        : 'bg-text-main text-white'
                     }`}
                   >
                     {renderMessageText(message.text)}
                   </div>
 
-                  {!isAssistant && <UserMessageAvatar user={user} />}
+                  {!isAssistant && <UserAvatar account={message.account} />}
                 </div>
               )
             })}
@@ -565,7 +621,7 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                   aria-hidden="true"
                 />
                 <div className="rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-700 mr-3">
-                  Lendo telas, dados reais e popups abertos...
+                  Nimbo está consultando dados reais do SMDN e pensando...
                 </div>
               </div>
             )}
@@ -574,23 +630,25 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
           </div>
 
           <div className="border-t border-border-soft p-4 space-y-2">
-            <div className="grid gap-2">
-              {context.suggestions.map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => sendToGemini(label)}
-                  disabled={sending}
-                  className="w-full rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {!settings.promptRecommendationsDisabled && (
+              <div className="grid gap-2">
+                {context.suggestions.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => sendToGemini(label)}
+                    disabled={sending}
+                    className="w-full rounded-xl border border-border-soft bg-bg-surface px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-2 pt-2">
               <label htmlFor="smdn-ai-message" className="sr-only">
-                Mensagem para IA SMDN
+                Mensagem para Nimbo
               </label>
 
               <textarea
@@ -617,37 +675,12 @@ export default function AssistantWidget({ currentScreen, setCurrentScreen, compa
                 disabled={sending || !draft.trim()}
                 className="w-full rounded-xl bg-text-main px-3 py-2 text-sm font-bold text-white hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {sending ? 'Consultando IA...' : 'Enviar para IA'}
+                {sending ? 'Consultando Nimbo...' : 'Enviar para Nimbo'}
               </button>
             </form>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setCurrentScreen('relatorios')}
-                className="rounded-xl bg-text-main/10 px-3 py-2 text-xs font-bold text-text-main hover:bg-text-main/20"
-              >
-                Ver relatórios
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setCurrentScreen('auditoria')}
-                className="rounded-xl bg-text-main/10 px-3 py-2 text-xs font-bold text-text-main hover:bg-text-main/20"
-              >
-                Ver auditoria
-              </button>
-            </div>
           </div>
-
-          <button type="button" aria-label="Redimensionar para cima" className="absolute left-4 right-4 top-0 h-2 cursor-ns-resize" onMouseDown={(event) => startResize(event, 'n', 'ns-resize')} />
-          <button type="button" aria-label="Redimensionar para baixo" className="absolute bottom-0 left-4 right-4 h-2 cursor-ns-resize" onMouseDown={(event) => startResize(event, 's', 'ns-resize')} />
-          <button type="button" aria-label="Redimensionar para esquerda" className="absolute bottom-4 left-0 top-4 w-2 cursor-ew-resize" onMouseDown={(event) => startResize(event, 'w', 'ew-resize')} />
-          <button type="button" aria-label="Redimensionar para direita" className="absolute bottom-4 right-0 top-4 w-2 cursor-ew-resize" onMouseDown={(event) => startResize(event, 'e', 'ew-resize')} />
-          <button type="button" aria-label="Redimensionar canto superior esquerdo" className="absolute left-0 top-0 h-4 w-4 cursor-nwse-resize" onMouseDown={(event) => startResize(event, 'nw', 'nwse-resize')} />
-          <button type="button" aria-label="Redimensionar canto superior direito" className="absolute right-0 top-0 h-4 w-4 cursor-nesw-resize" onMouseDown={(event) => startResize(event, 'ne', 'nesw-resize')} />
-          <button type="button" aria-label="Redimensionar canto inferior esquerdo" className="absolute bottom-0 left-0 h-4 w-4 cursor-nesw-resize" onMouseDown={(event) => startResize(event, 'sw', 'nesw-resize')} />
-          <button type="button" aria-label="Redimensionar canto inferior direito" className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-tl-lg bg-text-main/20 hover:bg-text-main/30" onMouseDown={(event) => startResize(event, 'se', 'nwse-resize')} title="Redimensionar" />
         </div>
       )}
     </div>
