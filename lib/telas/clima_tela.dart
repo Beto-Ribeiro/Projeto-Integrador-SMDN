@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import 'exportador_import.dart';
+import '../controles/controle_acessibilidade.dart';
 
 class ClimaTela extends StatefulWidget {
   const ClimaTela({super.key});
@@ -66,16 +68,19 @@ class _ClimaTelaState extends State<ClimaTela> {
           return;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         _mostrarErro("Permissão permanentemente negada");
         return;
       }
 
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      
-      final url = "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$apiKey&units=metric&lang=pt_br";
-      
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      final url =
+          "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$apiKey&units=metric&lang=pt_br";
+
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
@@ -112,19 +117,19 @@ class _ClimaTelaState extends State<ClimaTela> {
 
   @override
   Widget build(BuildContext context) {
+    final acessibilidade = context.watch<AccessibilityController>();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F3F5),
+      backgroundColor: acessibilidade.fundo,
 
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(18),
 
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
 
             children: [
-
-
               const SizedBox(height: 25),
 
               // Campo de busca
@@ -163,56 +168,68 @@ class _ClimaTelaState extends State<ClimaTela> {
 
               const SizedBox(height: 30),
 
-              const Text(
+              Text(
                 "Resultado:",
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w500,
+                  color: acessibilidade.corPrimaria,
                 ),
               ),
 
               const SizedBox(height: 15),
 
-              // RESULTADO DO CLIMA (CORRIGIDO)
+              // RESULTADO DO CLIMA (sem altura fixa, cresce com o texto)
               if (buscouClima)
                 Container(
-                  height: 150,
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFAFC7DA),
+                    color: acessibilidade.corSecundaria,
                     borderRadius: BorderRadius.circular(25),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      SingleChildScrollView(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               cidade,
-                              style: const TextStyle(fontSize: 18),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: acessibilidade.corPrimaria,
+                              ),
                             ),
                             const SizedBox(height: 10),
                             Text(
                               temperatura,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 50,
                                 fontWeight: FontWeight.bold,
+                                color: acessibilidade.corPrimaria,
                               ),
                             ),
                             Text(
                               descricao,
-                              style: const TextStyle(fontSize: 18),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: acessibilidade.corPrimaria,
+                              ),
                             ),
                           ],
                         ),
                       ),
 
-                      const Icon(
+                      const SizedBox(width: 10),
+
+                      Icon(
                         Icons.cloud,
                         size: 80,
+                        color: acessibilidade.corPrimaria,
                       ),
                     ],
                   ),
