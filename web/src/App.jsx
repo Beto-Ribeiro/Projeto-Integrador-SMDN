@@ -12,6 +12,7 @@ import Sidebar from './components/Sidebar.jsx'
 import { useAuth } from './hooks/useAuth.js'
 import { createWebAccessRequest } from './backend/auth/webAccessService.js'
 import { toFriendlyMessage } from './utils/friendlyMessages.js'
+import ConfirmacaoApp from './screens/ConfirmacaoApp.jsx'
 
 function AdminHomeScreen() {
   return <AdminPanel initialTab="all" />
@@ -26,6 +27,7 @@ const SCREENS = {
   perfil: Perfil,
   admin: AdminHomeScreen,
   users: UserList,
+  confirmacao: ConfirmacaoApp,
 }
 
 function getDevBypassFlags() {
